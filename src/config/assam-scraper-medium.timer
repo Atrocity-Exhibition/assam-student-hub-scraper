@@ -1,0 +1,9 @@
+[Unit]
+Description=Assam Student Hub Medium Scrapers Timer (Every 3 hours)
+
+[Timer]
+OnCalendar=*-*-* 00/3:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

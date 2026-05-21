@@ -1,0 +1,9 @@
+[Unit]
+Description=Assam Student Hub Fast Scrapers Timer (Every 30 mins)
+
+[Timer]
+OnCalendar=*:0/30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

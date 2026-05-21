@@ -1,0 +1,10 @@
+[Unit]
+Description=Assam Student Hub Fast Scrapers Service (SLPRB, APSC)
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/asmodeus/Projects/assam-student-hub-scrapers/src/run_scrapers.sh fast
+WorkingDirectory=/home/asmodeus/Projects/assam-student-hub-scrapers
+StandardOutput=journal
+StandardError=journal
