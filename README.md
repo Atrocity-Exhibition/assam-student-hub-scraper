@@ -6,26 +6,26 @@ The collected data is uploaded to a central Supabase instance to feed the [Assam
 
 ---
 
-## 🚀 Core Features
+## Core Features
 
-- 🕷️ **25+ Custom Crawlers**: Highly optimized parsers built using BeautifulSoup4 and HTTPX targeting:
-  - **Recruitment Boards**: Assam Public Service Commission (`apsc`), State Level Police Recruitment Board (`slprb`), GHC, AESRB, NHM.
-  - **Universities**: Gauhati University, Cotton University, Dibrugarh University, Tezpur University, Bodoland University, KKHSOU, AWU, ASTU, Assam University.
-  - **School & Higher Education Boards**: SEBA, AHSEC.
-- 💵 **Intelligent Salary & Pay Extraction**: Regular expression parser that identifies pay scales, stipends, and consolidated salaries from unstructured notification texts.
-- 🧬 **Robust Schema Validation**: Pydantic schemas validating fields, timestamps, categories, slugs, and attachments to ensure strict data quality.
-- 🛡️ **Reliability-Based Deduplication**: Merges overlapping notice copies across aggregators and official sources using `content_hash` and source priority rankings (`reliability_score`).
-- 📈 **Active Telemetry Tracking**: Logs run timings, status flags (`running`, `completed`, `failed`), scrape count statistics, and error tracebacks to the database. These logs are displayed in real-time on the frontend `/monitoring` page.
-- ⏱️ **Flexible CLI & Scheduling Groups**: Supports running specific scrapers, dry runs, record limits, and batch groups (fast, medium, slow, daily) perfect for cron or systemd automation.
+* **25+ Custom Crawlers**: Highly optimized parsers built using BeautifulSoup4 and HTTPX targeting:
+  * **Recruitment Boards**: Assam Public Service Commission (`apsc`), State Level Police Recruitment Board (`slprb`), GHC, AESRB, NHM.
+  * **Universities**: Gauhati University, Cotton University, Dibrugarh University, Tezpur University, Bodoland University, KKHSOU, AWU, ASTU, Assam University.
+  * **School & Higher Education Boards**: SEBA, AHSEC.
+* **Intelligent Salary and Pay Extraction**: Regular expression parser that identifies pay scales, stipends, and consolidated salaries from unstructured notification texts.
+* **Robust Schema Validation**: Pydantic schemas validating fields, timestamps, categories, slugs, and attachments to ensure strict data quality.
+* **Reliability-Based Deduplication**: Merges overlapping notice copies across aggregators and official sources using `content_hash` and source priority rankings (`reliability_score`).
+* **Active Telemetry Tracking**: Logs run timings, status flags (`running`, `completed`, `failed`), scrape count statistics, and error tracebacks to the database. These logs are displayed in real-time on the frontend `/monitoring` page.
+* **Flexible CLI and Scheduling Groups**: Supports running specific scrapers, dry runs, record limits, and batch groups (fast, medium, slow, daily) perfect for cron or systemd automation.
 
 ---
 
-## ⚙️ Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- Python 3.10 or later
-- Access credentials for a Supabase database instance
+* Python 3.10 or later
+* Access credentials for a Supabase database instance
 
 ### 1. Installation
 
@@ -60,7 +60,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
 ---
 
-## 🛠️ Usage CLI
+## Usage CLI
 
 ### Run a Single Scraper
 
@@ -101,7 +101,7 @@ bash src/run_scrapers.sh daily
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```
 src/
@@ -119,6 +119,6 @@ src/
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License.
