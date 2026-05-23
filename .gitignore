@@ -30,3 +30,7 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Developer Notes & Plans
+job-plan.txt
+uni-plan.txt

@@ -9,6 +9,7 @@ class ScrapedItem(BaseModel):
     description: Optional[str] = ""
     source: str
     source_url: str
+    canonical_url: Optional[str] = None
     category: str
     content_type: Optional[str] = None
     institution: str
@@ -27,19 +28,36 @@ class ScrapedItem(BaseModel):
     content_hash: Optional[str] = None
     attachment_url: Optional[str] = None
     institution_id: Optional[int] = None
+    reliability_score: int = 10
 
     @model_validator(mode="before")
     @classmethod
     def populate_slugs(cls, data):
         if isinstance(data, dict):
+            from utils.normalizer import clean_title, normalize_description, normalize_date, normalize_category, generate_content_hash
+            
+            # Clean and normalize fields
+            title = clean_title(data.get("title", ""))
+            data["title"] = title
+            
+            desc = normalize_description(data.get("description", "") or "")
+            data["description"] = desc
+            
+            if data.get("posted_at"):
+                data["posted_at"] = normalize_date(data["posted_at"])
+                
+            # Force last_seen_at to timezone-aware UTC
+            if data.get("last_seen_at"):
+                data["last_seen_at"] = normalize_date(data["last_seen_at"])
+
             # Auto-generate institution_slug if missing
             inst = data.get("institution", "")
             if inst and not data.get("institution_slug"):
                 data["institution_slug"] = slugify(inst)
             
             # Auto-generate unique slug if missing
-            title = data.get("title", "")
-            source_url = data.get("source_url", "")
+            source_url = data.get("source_url", "").strip()
+            data["source_url"] = source_url
             if title and source_url and not data.get("slug"):
                 slug_base = f"{slugify(inst)}-{slugify(title)}"
                 # Append short hash of source URL to avoid slug collisions
@@ -47,24 +65,31 @@ class ScrapedItem(BaseModel):
                 # Truncate slug_base to 100 chars to avoid very long filenames/slugs
                 data["slug"] = f"{slug_base[:100]}-{url_hash}"
                 
+            # Default category if missing (normalize it)
+            if not data.get("category"):
+                data["category"] = normalize_category(title)
+            else:
+                data["category"] = clean_title(data["category"]).lower()
+
             # Default content_type if missing (falls back to category)
-            if not data.get("content_type") and data.get("category"):
-                data["content_type"] = data.get("category")
+            if not data.get("content_type"):
+                data["content_type"] = data["category"]
 
             # Auto-populate is_official based on scraper name
             scr_name = data.get("scraper_name")
-            if scr_name in ("assam_career", "daily_assam_job", "ncs_portal"):
+            if scr_name in ("assam_career", "daily_assam_job", "ncs_portal", "all_job_assam"):
                 data["is_official"] = False
             else:
                 data["is_official"] = True
 
-            # Auto-generate content_hash if missing
-            desc = data.get("description", "") or ""
+            # Set canonical_url (fallback to source_url)
+            if not data.get("canonical_url"):
+                data["canonical_url"] = source_url
+
+            # Auto-generate SHA256 content_hash if missing
             if title and not data.get("content_hash"):
-                norm_title = " ".join(title.split()).strip().lower()
-                norm_desc = " ".join(desc.split()).strip().lower()
-                hash_base = f"{norm_title}|{norm_desc}"
-                data["content_hash"] = hashlib.md5(hash_base.encode("utf-8")).hexdigest()
+                data["content_hash"] = generate_content_hash(title, desc)
+                
         return data
 
     def to_dict(self) -> dict:
@@ -80,3 +105,4 @@ class ScrapedItem(BaseModel):
         if isinstance(data.get("scraped_at"), datetime):
             data["scraped_at"] = data["scraped_at"].isoformat()
         return data
+

@@ -93,7 +93,7 @@ def bulk_upsert_notices(items: List[ScrapedItem]) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error querying existing source_urls for stats computation: {e}")
 
-    # Duplicate merging logic using content_hash
+    # Duplicate merging logic using content_hash and reliability_score
     aggregator_updates_needed = []
     try:
         hashes = [item.content_hash for item in unique_items if item.content_hash]
@@ -101,21 +101,29 @@ def bulk_upsert_notices(items: List[ScrapedItem]) -> Dict[str, Any]:
         if hashes:
             for i in range(0, len(hashes), 100):
                 batch_hashes = hashes[i:i+100]
-                resp = supabase.table("notices").select("id, content_hash, is_official").in_("content_hash", batch_hashes).execute()
+                resp = supabase.table("notices").select("id, content_hash, source_url, reliability_score").in_("content_hash", batch_hashes).execute()
                 if resp.data:
                     for row in resp.data:
-                        existing_by_hash[row["content_hash"]] = row
+                        if row["content_hash"] not in existing_by_hash:
+                            existing_by_hash[row["content_hash"]] = []
+                        existing_by_hash[row["content_hash"]].append(row)
         
         for item in unique_items:
             if item.content_hash and item.content_hash in existing_by_hash:
-                existing = existing_by_hash[item.content_hash]
-                # Case A: Incoming is aggregator, existing is official -> link incoming to existing
-                if not item.is_official and existing.get("is_official"):
-                    item.merged_into_notice_id = existing["id"]
-                    logger.info(f"Deduplication: Merging aggregator notice '{item.title}' into existing official notice ID {existing['id']}")
-                # Case B: Incoming is official, existing is aggregator -> we will update existing aggregator notice after this batch is inserted
-                elif item.is_official and not existing.get("is_official"):
-                    aggregator_updates_needed.append((existing["id"], item.content_hash))
+                existing_records = existing_by_hash[item.content_hash]
+                # Filter out the record if it matches our own source_url (to avoid comparing with ourselves on update)
+                other_existing = [r for r in existing_records if r["source_url"] != item.source_url]
+                if other_existing:
+                    best_existing = max(other_existing, key=lambda x: x.get("reliability_score") or 10)
+                    best_rel = best_existing.get("reliability_score") or 10
+                    
+                    if item.reliability_score < best_rel:
+                        # Case A: Incoming notice is less reliable than the existing one -> merge incoming into existing
+                        item.merged_into_notice_id = best_existing["id"]
+                        logger.info(f"Deduplication: Merging notice '{item.title}' (reliability {item.reliability_score}) into existing more reliable notice ID {best_existing['id']} (reliability {best_rel})")
+                    else:
+                        # Case B: Incoming notice is more or equally reliable -> merge existing into incoming (after incoming is inserted)
+                        aggregator_updates_needed.append((best_existing["id"], item.content_hash))
     except Exception as e:
         logger.error(f"Error resolving duplicate notices merging: {e}")
 
@@ -135,19 +143,23 @@ def bulk_upsert_notices(items: List[ScrapedItem]) -> Dict[str, Any]:
         affected_count = len(response.data) if response.data else len(records)
         logger.info(f"Database Ingestion: Successfully upserted {affected_count} records. (New inserts: {inserted_count}, Updates: {updated_count})")
         
-        # Post-upsert: Link existing aggregator notices to newly inserted official notices (Case B)
+        # Post-upsert: Link less reliable existing notices to the newly inserted more reliable notices (Case B)
         if aggregator_updates_needed and response.data:
-            hash_to_inserted_id = {}
+            hash_to_inserted = {}
             for row in response.data:
-                if row.get("content_hash") and row.get("is_official"):
-                    hash_to_inserted_id[row["content_hash"]] = row["id"]
+                if row.get("content_hash"):
+                    # Map to (id, reliability_score)
+                    rel = row.get("reliability_score") or 10
+                    if row["content_hash"] not in hash_to_inserted or rel > hash_to_inserted[row["content_hash"]][1]:
+                        hash_to_inserted[row["content_hash"]] = (row["id"], rel)
             
             for agg_id, content_hash in aggregator_updates_needed:
-                if content_hash in hash_to_inserted_id:
-                    official_id = hash_to_inserted_id[content_hash]
+                if content_hash in hash_to_inserted:
+                    official_id, official_rel = hash_to_inserted[content_hash]
                     try:
+                        # Double-check that we aren't linking a record to itself or to something less reliable
                         supabase.table("notices").update({"merged_into_notice_id": official_id}).eq("id", agg_id).execute()
-                        logger.info(f"Deduplication: Linked existing aggregator notice ID {agg_id} to new official notice ID {official_id}")
+                        logger.info(f"Deduplication: Linked lower reliability notice ID {agg_id} to new higher reliability notice ID {official_id}")
                     except Exception as err:
                         logger.error(f"Failed to link aggregator notice {agg_id} to official notice {official_id}: {err}")
 
@@ -167,3 +179,4 @@ def bulk_upsert_notices(items: List[ScrapedItem]) -> Dict[str, Any]:
             "inserted_count": 0,
             "updated_count": 0
         }
+

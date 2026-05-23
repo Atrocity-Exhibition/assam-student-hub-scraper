@@ -29,6 +29,14 @@ logging.basicConfig(
 logger = logging.getLogger("BaseScraper")
 
 class BaseScraper(ABC):
+    # Mandatory metadata contracts to be defined in subclasses
+    SOURCE_NAME: str = ""
+    SOURCE_TYPE: str = ""      # "government" | "university" | "aggregator" | "other"
+    BASE_URL: str = ""
+    CATEGORY: str = ""         # "jobs" | "academic" | "mixed"
+    SUPPORTED_CONTENT: List[str] = []
+    RELIABILITY_SCORE: int = 10
+
     def __init__(self, name: str, institution: str, source: Optional[str] = None):
         """
         Initialize the base scraper.
@@ -42,6 +50,17 @@ class BaseScraper(ABC):
         self.logger = logging.getLogger(f"scraper.{name}")
         self.headers = settings.DEFAULT_HEADERS.copy()
 
+        # Load metadata-driven scheduling config & rate limit preferences
+        from config.scrapers_config import SCRAPER_CONFIG
+        self.config = SCRAPER_CONFIG.get(name, {})
+        
+        rate_limit = self.config.get("rate_limit", {})
+        self.delay_seconds = float(rate_limit.get("delay_seconds", settings.REQUEST_DELAY))
+        self.jitter = bool(rate_limit.get("jitter", True))
+        
+        # Override default request timeout if specified in config
+        self.timeout = int(self.config.get("timeout", settings.REQUEST_TIMEOUT))
+
     @retry(
         stop=stop_after_attempt(settings.MAX_RETRIES),
         wait=wait_exponential(multiplier=1, min=2, max=10),
@@ -54,14 +73,21 @@ class BaseScraper(ABC):
         """
         self.logger.info(f"Fetching URL: {url}")
         
-        # Polite crawl delay
-        time.sleep(settings.REQUEST_DELAY)
+        # Polite crawl delay with optional jitter
+        import random
+        if self.jitter:
+            actual_delay = random.uniform(self.delay_seconds * 0.5, self.delay_seconds * 1.5)
+        else:
+            actual_delay = self.delay_seconds
+            
+        self.logger.debug(f"Sleeping for {actual_delay:.2f} seconds before request")
+        time.sleep(actual_delay)
         
         response = requests.get(
             url,
             headers=self.headers,
             params=params,
-            timeout=settings.REQUEST_TIMEOUT,
+            timeout=self.timeout,
             verify=False  # Disable SSL verification since some official portals have broken cert paths
         )
         response.raise_for_status()
@@ -93,6 +119,7 @@ class BaseScraper(ABC):
                     raw["institution"] = self.institution
                     raw["scraper_name"] = self.name
                     raw["source"] = self.source
+                    raw["reliability_score"] = getattr(self, "RELIABILITY_SCORE", 10)
                     
                     item = ScrapedItem(**raw)
                     validated_items.append(item)
@@ -109,3 +136,4 @@ class BaseScraper(ABC):
             self.logger.exception(f"Scraper execution crashed: {e}")
             
         return validated_items
+
