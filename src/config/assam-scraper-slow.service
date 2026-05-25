@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/home/asmodeus/Projects/assam-student-hub-scrapers/src/run_scrapers.sh slow
-WorkingDirectory=/home/asmodeus/Projects/assam-student-hub-scrapers
+ExecStart=/home/asmodeus/Projects/assam-student-hub/scrapers/src/run_scrapers.sh slow
+WorkingDirectory=/home/asmodeus/Projects/assam-student-hub/scrapers
 StandardOutput=journal
 StandardError=journal

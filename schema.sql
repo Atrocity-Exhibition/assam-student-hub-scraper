@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS notices (
     removed_at TIMESTAMP WITH TIME ZONE,
     reliability_score INTEGER DEFAULT 10,
     scraper_name TEXT,
-    search_vector tsvector
+    search_vector tsvector,
+    metadata JSONB DEFAULT '{}'::jsonb NOT NULL
 );
 
 -- 4. Create Scraper Runs Table

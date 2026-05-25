@@ -54,6 +54,10 @@ class ScraperRunTracker:
         """
         Sends an alert notification embed to the configured Discord channel webhook.
         """
+        if self.scraper_name.startswith("test_"):
+            logger.info(f"Skipping Discord alert for test scraper '{self.scraper_name}'.")
+            return
+
         from config.settings import DISCORD_WEBHOOK_URL
         if not DISCORD_WEBHOOK_URL:
             logger.warning("DISCORD_WEBHOOK_URL is not set. Skipping Discord alert.")
