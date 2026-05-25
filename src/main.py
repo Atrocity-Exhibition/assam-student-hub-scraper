@@ -75,6 +75,11 @@ def main():
         default=None,
         help="Scraper to execute (default: run APSC if no filters specified)"
     )
+    parser.add_argument(
+        "--all", "-a",
+        action="store_true",
+        help="Execute all scrapers in sequence"
+    )
     
     # Metadata-driven scheduling filters
     parser.add_argument(
@@ -122,7 +127,9 @@ def main():
 
     # Resolve list of scrapers to run
     scrapers_to_run = []
-    if args.scraper:
+    if args.all:
+        scrapers_to_run = list(SCRAPER_CONFIG.keys())
+    elif args.scraper:
         scrapers_to_run.append(args.scraper)
     elif args.frequency or args.priority or args.category:
         for name, cfg in SCRAPER_CONFIG.items():
@@ -157,7 +164,7 @@ def main():
         if name == "apsc":
             scraper = cls(year=args.year)
         elif name == "cotton":
-            scraper = cls(limit=args.limit)
+            scraper = cls(limit=args.limit or 15)
         elif name == "dibrugarh":
             scraper = cls(limit=args.limit or 30)
         else:
