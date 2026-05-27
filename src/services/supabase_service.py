@@ -101,7 +101,7 @@ def bulk_upsert_notices(items: List[ScrapedItem]) -> Dict[str, Any]:
         if hashes:
             for i in range(0, len(hashes), 100):
                 batch_hashes = hashes[i:i+100]
-                resp = supabase.table("notices").select("id, content_hash, source_url, reliability_score").in_("content_hash", batch_hashes).execute()
+                resp = supabase.table("notices").select("id, content_hash, source_url, is_official").in_("content_hash", batch_hashes).execute()
                 if resp.data:
                     for row in resp.data:
                         if row["content_hash"] not in existing_by_hash:
@@ -114,8 +114,10 @@ def bulk_upsert_notices(items: List[ScrapedItem]) -> Dict[str, Any]:
                 # Filter out the record if it matches our own source_url (to avoid comparing with ourselves on update)
                 other_existing = [r for r in existing_records if r["source_url"] != item.source_url]
                 if other_existing:
-                    best_existing = max(other_existing, key=lambda x: x.get("reliability_score") or 10)
-                    best_rel = best_existing.get("reliability_score") or 10
+                    def get_rel_score(r):
+                        return 10 if r.get("is_official", True) else 6
+                    best_existing = max(other_existing, key=get_rel_score)
+                    best_rel = get_rel_score(best_existing)
                     
                     if item.reliability_score < best_rel:
                         # Case A: Incoming notice is less reliable than the existing one -> merge incoming into existing
@@ -128,7 +130,12 @@ def bulk_upsert_notices(items: List[ScrapedItem]) -> Dict[str, Any]:
         logger.error(f"Error resolving duplicate notices merging: {e}")
 
     # Convert Pydantic models to dicts formatted for PG database columns
-    records = [item.to_dict() for item in unique_items]
+    records = []
+    for item in unique_items:
+        d = item.to_dict()
+        d.pop("reliability_score", None)
+        d.pop("canonical_url", None)
+        records.append(d)
     logger.info(f"Database Ingestion: Preparing bulk upsert for {len(records)} notices")
 
     try:
@@ -149,7 +156,7 @@ def bulk_upsert_notices(items: List[ScrapedItem]) -> Dict[str, Any]:
             for row in response.data:
                 if row.get("content_hash"):
                     # Map to (id, reliability_score)
-                    rel = row.get("reliability_score") or 10
+                    rel = 10 if row.get("is_official", True) else 6
                     if row["content_hash"] not in hash_to_inserted or rel > hash_to_inserted[row["content_hash"]][1]:
                         hash_to_inserted[row["content_hash"]] = (row["id"], rel)
             
