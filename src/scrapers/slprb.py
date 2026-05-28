@@ -5,6 +5,7 @@ import requests
 
 from scrapers.base_scraper import BaseScraper
 from utils.parser_utils import resolve_url, clean_text, parse_date, classify_category
+from utils.field_extractor import extract_fields_for_category
 
 class SLPRBScraper(BaseScraper):
     def __init__(self):
@@ -119,6 +120,8 @@ class SLPRBScraper(BaseScraper):
                     "row_index": idx,
                     "link_index": a_idx
                 }
+                extracted_meta = extract_fields_for_category(category, title, description)
+                meta.update(extracted_meta)
 
                 description = f"SLPRB Recruitment Notice. Reference No: {advt_no}." if advt_no else "SLPRB Recruitment Notice."
 

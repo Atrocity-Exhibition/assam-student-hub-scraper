@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from scrapers.base_scraper import BaseScraper
 from utils.parser_utils import parse_date, classify_category
+from utils.field_extractor import extract_fields_for_category
 
 class SEBAScraper(BaseScraper):
     def __init__(self):
@@ -57,6 +58,14 @@ class SEBAScraper(BaseScraper):
         for idx, n in enumerate(self.known_notices):
             category = n.get("category") or classify_category(n["title"])
             
+            meta = {
+                "bullets": n["bullets"],
+                "streams": "HSLC (Class 10) — All subjects",
+                "original_source": self.base_url
+            }
+            extracted_meta = extract_fields_for_category(category, n["title"], n["desc"])
+            meta.update(extracted_meta)
+
             items.append({
                 "title": n["title"],
                 "description": n["desc"],
@@ -65,11 +74,7 @@ class SEBAScraper(BaseScraper):
                 "content_type": category,
                 "posted_at": datetime.now(timezone.utc), # Use current datetime as posted time
                 "tags": ["SEBA", "HSLC", "Class 10", category],
-                "metadata": {
-                    "bullets": n["bullets"],
-                    "streams": "HSLC (Class 10) — All subjects",
-                    "original_source": self.base_url
-                },
+                "metadata": meta,
                 "raw_html": f"SEBA Offline Notice: {n['title']}"
             })
 

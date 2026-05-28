@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 
 from scrapers.base_scraper import BaseScraper
 from utils.parser_utils import resolve_url, clean_text, parse_date, classify_category
+from utils.field_extractor import extract_fields_for_category
 
 class AHSECScraper(BaseScraper):
     def __init__(self):
@@ -66,19 +67,24 @@ class AHSECScraper(BaseScraper):
                 if resolved_url.lower().endswith(".pdf"):
                     attachment_url = resolved_url
 
+                description = f"AHSEC notification: {title}. Check ahsec.assam.gov.in for full schedule and details."
+                meta = {
+                    "streams": "Arts / Science / Commerce",
+                    "original_source": self.base_url
+                }
+                extracted_meta = extract_fields_for_category(category, title, description)
+                meta.update(extracted_meta)
+
                 items.append({
                     "title": title,
-                    "description": f"AHSEC notification: {title}. Check ahsec.assam.gov.in for full schedule and details.",
+                    "description": description,
                     "source_url": resolved_url,
                     "attachment_url": attachment_url,
                     "category": category,
                     "content_type": category,
                     "posted_at": posted_at,
                     "tags": ["AHSEC", "Board Exam", "Assam Board", category],
-                    "metadata": {
-                        "streams": "Arts / Science / Commerce",
-                        "original_source": self.base_url
-                    },
+                    "metadata": meta,
                     "raw_html": str(a)
                 })
 

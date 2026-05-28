@@ -7,6 +7,7 @@ import requests
 
 from scrapers.base_scraper import BaseScraper
 from utils.parser_utils import resolve_url, clean_text, parse_date, classify_category
+from utils.field_extractor import extract_fields_for_category
 from utils.slug import slugify
 
 class GauhatiScraper(BaseScraper):
@@ -139,14 +140,16 @@ class GauhatiScraper(BaseScraper):
             if category == "notice" and default_category:
                 category = default_category
 
+            description = f"Notification published by Gauhati University on {n['date']}."
+            
             # Save additional links and metadata
             meta = {
                 "original_date": n["date"],
                 "all_links": [{"text": txt, "url": href} for txt, href in n["links"]],
                 "all_attachments": [{"text": txt, "url": href} for txt, href in n["attachments"]]
             }
-
-            description = f"Notification published by Gauhati University on {n['date']}."
+            extracted_meta = extract_fields_for_category(category, title, description)
+            meta.update(extracted_meta)
 
             items.append({
                 "title": title,

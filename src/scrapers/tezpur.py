@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 
 from scrapers.base_scraper import BaseScraper
 from utils.parser_utils import resolve_url, clean_text, parse_date, classify_category
+from utils.field_extractor import extract_fields_for_category
 
 class TezpurScraper(BaseScraper):
     def __init__(self):
@@ -68,18 +69,23 @@ class TezpurScraper(BaseScraper):
                     if resolved_url.lower().endswith(".pdf"):
                         attachment_url = resolved_url
 
+                    description = f"Official notice from Tezpur University. Source: {self.source}."
+                    meta = {
+                        "original_page": page_url
+                    }
+                    extracted_meta = extract_fields_for_category(category, title, description)
+                    meta.update(extracted_meta)
+
                     items.append({
                         "title": title,
-                        "description": f"Official notice from Tezpur University. Source: {self.source}.",
+                        "description": description,
                         "source_url": resolved_url,
                         "attachment_url": attachment_url,
                         "category": category,
                         "content_type": category,
                         "posted_at": posted_at,
                         "tags": ["Tezpur University", "TU", category],
-                        "metadata": {
-                            "original_page": page_url
-                        },
+                        "metadata": meta,
                         "raw_html": str(a)
                     })
 

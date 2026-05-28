@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from scrapers.base_scraper import BaseScraper
 from utils.parser_utils import resolve_url
 from utils.normalizer import clean_title, normalize_date, normalize_category
+from utils.field_extractor import extract_fields_for_category
 
 class KKHSOUScraper(BaseScraper):
     SOURCE_NAME = "Krishna Kanta Handiqui State Open University"
@@ -115,6 +116,13 @@ class KKHSOUScraper(BaseScraper):
                         if category == "notice":
                             category = default_cat
 
+                        extracted_meta = extract_fields_for_category(category, title, f"Official update from KKHSOU: '{title}'")
+                        meta = {
+                            "original_category": cat_name,
+                            "detail_page_url": resolved_detail_url
+                        }
+                        meta.update(extracted_meta)
+
                         items.append({
                             "title": title,
                             "description": f"Official update from KKHSOU: '{title}'. Please refer to the notice details page or attachment for full details.",
@@ -125,10 +133,7 @@ class KKHSOUScraper(BaseScraper):
                             "content_type": category,
                             "posted_at": posted_at,
                             "tags": ["KKHSOU", "University", "Guwahati", category],
-                            "metadata": {
-                                "original_category": cat_name,
-                                "detail_page_url": resolved_detail_url
-                            },
+                            "metadata": meta,
                             "raw_html": str(row)
                         })
 

@@ -5,6 +5,7 @@ import requests
 
 from scrapers.base_scraper import BaseScraper
 from utils.parser_utils import resolve_url, clean_text, parse_date, classify_category
+from utils.field_extractor import extract_fields_for_category
 
 class APSCScraper(BaseScraper):
     def __init__(self, year: Optional[int] = None):
@@ -107,7 +108,8 @@ class APSCScraper(BaseScraper):
                 "content_type": "recruitment",
                 "posted_at": posted_at,
                 "tags": [advt_no, "APSC", "job", "recruitment"],
-                "raw_html": str(row)
+                "raw_html": str(row),
+                "metadata": extract_fields_for_category("recruitment", title, description)
             })
 
         return items
@@ -160,7 +162,8 @@ class APSCScraper(BaseScraper):
                 "content_type": category,
                 "posted_at": posted_at,
                 "tags": ["APSC", "notification"],
-                "raw_html": str(row)
+                "raw_html": str(row),
+                "metadata": extract_fields_for_category(category, title, f"APSC Notification published on {date_str}.")
             })
 
         return items

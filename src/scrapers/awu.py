@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 from scrapers.base_scraper import BaseScraper
 from utils.parser_utils import resolve_url
 from utils.normalizer import clean_title, normalize_date, normalize_category
+from utils.field_extractor import extract_fields_for_category
 
 class AWUScraper(BaseScraper):
     SOURCE_NAME = "Assam Women's University"
@@ -96,9 +97,18 @@ class AWUScraper(BaseScraper):
                     if category == "notice":
                         category = default_cat
 
+                    description = f"Official notice from Assam Women's University: '{title}'. Sourced from AWU Portal."
+                    meta = {
+                        "original_type": type_val,
+                        "publish_date_raw": pub_date,
+                        "api_id": n.get("id")
+                    }
+                    extracted_meta = extract_fields_for_category(category, title, description)
+                    meta.update(extracted_meta)
+
                     items.append({
                         "title": title,
-                        "description": f"Official notice from Assam Women's University: '{title}'. Sourced from AWU Portal.",
+                        "description": description,
                         "source_url": "https://awu.ac.in/notifications.html",
                         "canonical_url": "https://awu.ac.in/notifications.html",
                         "attachment_url": attachment_url,
@@ -106,11 +116,7 @@ class AWUScraper(BaseScraper):
                         "content_type": category,
                         "posted_at": posted_at,
                         "tags": ["AWU", "University", "Jorhat", category],
-                        "metadata": {
-                            "original_type": type_val,
-                            "publish_date_raw": pub_date,
-                            "api_id": n.get("id")
-                        },
+                        "metadata": meta,
                         "raw_html": str(n)
                     })
 

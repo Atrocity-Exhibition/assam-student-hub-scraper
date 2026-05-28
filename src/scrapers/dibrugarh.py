@@ -5,6 +5,7 @@ import requests
 
 from scrapers.base_scraper import BaseScraper
 from utils.parser_utils import parse_date, classify_category
+from utils.field_extractor import extract_fields_for_category
 
 class DibrugarhScraper(BaseScraper):
     def __init__(self, limit: int = 30):
@@ -114,6 +115,9 @@ class DibrugarhScraper(BaseScraper):
                     if all_attachments:
                         attachment_url = all_attachments[0]["url"]
 
+                    # Fallback description
+                    description = post.get("excerpt") or f"Notification published by Dibrugarh University on {posted_at.strftime('%Y-%m-%d') if posted_at else 'recent date'}."
+
                     metadata = {
                         "post_id": post.get("id"),
                         "slug": slug,
@@ -121,9 +125,8 @@ class DibrugarhScraper(BaseScraper):
                         "all_links": all_links,
                         "archive_date": post.get("archive_date")
                     }
-
-                    # Fallback description
-                    description = post.get("excerpt") or f"Notification published by Dibrugarh University on {posted_at.strftime('%Y-%m-%d') if posted_at else 'recent date'}."
+                    extracted_meta = extract_fields_for_category(category, title, description)
+                    metadata.update(extracted_meta)
 
                     results.append({
                         "title": title,

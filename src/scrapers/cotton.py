@@ -6,6 +6,7 @@ import requests
 
 from scrapers.base_scraper import BaseScraper
 from utils.parser_utils import resolve_url, clean_text, parse_date, classify_category
+from utils.field_extractor import extract_fields_for_category
 
 class CottonScraper(BaseScraper):
     def __init__(self, limit: Optional[int] = 15):
@@ -119,7 +120,8 @@ class CottonScraper(BaseScraper):
                     "content_type": category,
                     "posted_at": posted_at,
                     "tags": ["Cotton University", "CU", category],
-                    "raw_html": str(row)
+                    "raw_html": str(row),
+                    "metadata": extract_fields_for_category(category, raw_title, description)
                 })
 
             except Exception as e:
