@@ -36,6 +36,7 @@ from scrapers.institutions.ignou_guwahati import IGNOUGuwahatiScraper
 from scrapers.institutions.don_bosco import DonBoscoScraper
 from scrapers.institutions.pandu_college import PanduCollegeScraper
 from scrapers.institutions.adtu import ADTUScraper
+from scrapers.institutions.dhe_assam import DHEAssamScraper
 
 # Aggregators Scrapers
 from scrapers.aggregators.assam_career import AssamCareerScraper
@@ -79,7 +80,8 @@ SCRAPER_CLASSES = {
     "ignou_guwahati": IGNOUGuwahatiScraper,
     "don_bosco": DonBoscoScraper,
     "pandu_college": PanduCollegeScraper,
-    "adtu": ADTUScraper
+    "adtu": ADTUScraper,
+    "dhe_assam": DHEAssamScraper
 }
 
 def main():

@@ -314,5 +314,15 @@ SCRAPER_CONFIG = {
             "delay_seconds": 2.0,
             "jitter": True,
         }
+    },
+    "dhe_assam": {
+        "frequency": "24h",
+        "timeout": 30,
+        "priority": "low",
+        "category": "academic",
+        "rate_limit": {
+            "delay_seconds": 2.0,
+            "jitter": True,
+        }
     }
 }

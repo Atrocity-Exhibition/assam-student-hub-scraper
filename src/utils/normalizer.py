@@ -81,7 +81,7 @@ def normalize_category(title: str) -> str:
         return "exam"
     elif any(k in title_lower for k in ["admission", "admissions", "intake", "enrolment"]):
         return "admission"
-    elif any(k in title_lower for k in ["scholarship", "scholarships", "fellowship", "award"]):
+    elif any(k in title_lower for k in ["scholarship", "scholarships", "fellowship", "award", "stipend", "grant", "aasoni", "nijut"]):
         return "scholarship"
     elif any(k in title_lower for k in ["recruit", "advt", "vacancy", "advertisement", "post of", "recruitment", "appoint"]):
         return "recruitment"
