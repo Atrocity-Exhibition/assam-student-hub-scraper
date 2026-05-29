@@ -19,7 +19,8 @@ class AssamUniversityScraper(BaseScraper):
         super().__init__(
             name="assam_university",
             institution="Assam University, Silchar",
-            source="Assam University"
+            source="Assam University",
+            institution_slug="assam-university"
         )
         self.target_url = "http://www.aus.ac.in"
         self.relevant_keywords = [

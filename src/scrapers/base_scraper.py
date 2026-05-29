@@ -37,16 +37,18 @@ class BaseScraper(ABC):
     SUPPORTED_CONTENT: List[str] = []
     RELIABILITY_SCORE: int = 10
 
-    def __init__(self, name: str, institution: str, source: Optional[str] = None):
+    def __init__(self, name: str, institution: str, source: Optional[str] = None, institution_slug: Optional[str] = None):
         """
         Initialize the base scraper.
         :param name: Scraper identifier (e.g. 'apsc')
         :param institution: Target organization name (e.g. 'Assam Public Service Commission')
         :param source: Optional human-readable source name (e.g. 'APSC')
+        :param institution_slug: Optional slug override to match the database institutions table
         """
         self.name = name
         self.institution = institution
         self.source = source or name.upper()
+        self.institution_slug = institution_slug
         self.logger = logging.getLogger(f"scraper.{name}")
         self.headers = settings.DEFAULT_HEADERS.copy()
 
@@ -117,6 +119,8 @@ class BaseScraper(ABC):
                 try:
                     # Inject base parameters if missing
                     raw["institution"] = self.institution
+                    if self.institution_slug:
+                        raw["institution_slug"] = self.institution_slug
                     raw["scraper_name"] = self.name
                     raw["source"] = self.source
                     raw["reliability_score"] = getattr(self, "RELIABILITY_SCORE", 10)

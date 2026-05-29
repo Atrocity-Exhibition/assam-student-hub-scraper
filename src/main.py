@@ -3,33 +3,45 @@ import sys
 import logging
 
 from config.scrapers_config import SCRAPER_CONFIG
-from scrapers.apsc import APSCScraper
-from scrapers.slprb import SLPRBScraper
-from scrapers.gauhati import GauhatiScraper
-from scrapers.cotton import CottonScraper
-from scrapers.dibrugarh import DibrugarhScraper
-from scrapers.assam_career import AssamCareerScraper
-from scrapers.daily_assam_job import DailyAssamJobScraper
-from scrapers.nhm_assam import NHMAssamScraper
-from scrapers.aesrb import AESRBScraper
-from scrapers.ncs_portal import NCSPortalScraper
-from scrapers.tezpur import TezpurScraper
-from scrapers.bodoland import BodolandScraper
-from scrapers.mangaldai import MangaldaiScraper
-from scrapers.ahsec import AHSECScraper
-from scrapers.seba import SEBAScraper
 
-# New Scrapers implemented in Phase 1
-from scrapers.assam_university import AssamUniversityScraper
-from scrapers.astu import ASTUScraper
-from scrapers.ghc import GHCScraper
-from scrapers.all_job_assam import AllJobAssamScraper
+# Jobs Scrapers
+from scrapers.jobs.apsc import APSCScraper
+from scrapers.jobs.slprb import SLPRBScraper
+from scrapers.jobs.nhm_assam import NHMAssamScraper
+from scrapers.jobs.aesrb import AESRBScraper
+from scrapers.jobs.ncs_portal import NCSPortalScraper
+from scrapers.jobs.ghc import GHCScraper
+from scrapers.jobs.nrl import NRLScraper
 
-# Batch 2 Scrapers
-from scrapers.kkhsou import KKHSOUScraper
-from scrapers.awu import AWUScraper
-from scrapers.nrl import NRLScraper
-from scrapers.assam_job_news import AssamJobNewsScraper
+# Institutions Scrapers
+from scrapers.institutions.gauhati import GauhatiScraper
+from scrapers.institutions.cotton import CottonScraper
+from scrapers.institutions.dibrugarh import DibrugarhScraper
+from scrapers.institutions.tezpur import TezpurScraper
+from scrapers.institutions.bodoland import BodolandScraper
+from scrapers.institutions.mangaldai import MangaldaiScraper
+from scrapers.institutions.ahsec import AHSECScraper
+from scrapers.institutions.seba import SEBAScraper
+from scrapers.institutions.assam_university import AssamUniversityScraper
+from scrapers.institutions.astu import ASTUScraper
+from scrapers.institutions.kkhsou import KKHSOUScraper
+from scrapers.institutions.awu import AWUScraper
+
+# 8 New Colleges/Universities Scrapers
+from scrapers.institutions.darrang_college import DarrangCollegeScraper
+from scrapers.institutions.tezpur_college import TezpurCollegeScraper
+from scrapers.institutions.lokd_college import LOKDCollegeScraper
+from scrapers.institutions.royal_global import RoyalGlobalScraper
+from scrapers.institutions.ignou_guwahati import IGNOUGuwahatiScraper
+from scrapers.institutions.don_bosco import DonBoscoScraper
+from scrapers.institutions.pandu_college import PanduCollegeScraper
+from scrapers.institutions.adtu import ADTUScraper
+
+# Aggregators Scrapers
+from scrapers.aggregators.assam_career import AssamCareerScraper
+from scrapers.aggregators.daily_assam_job import DailyAssamJobScraper
+from scrapers.aggregators.all_job_assam import AllJobAssamScraper
+from scrapers.aggregators.assam_job_news import AssamJobNewsScraper
 
 from services.supabase_service import bulk_upsert_notices
 
@@ -50,18 +62,24 @@ SCRAPER_CLASSES = {
     "mangaldai": MangaldaiScraper,
     "ahsec": AHSECScraper,
     "seba": SEBAScraper,
-    
-    # New Scrapers
     "assam_university": AssamUniversityScraper,
     "astu": ASTUScraper,
     "ghc": GHCScraper,
     "all_job_assam": AllJobAssamScraper,
-    
-    # Batch 2 Scrapers
     "kkhsou": KKHSOUScraper,
     "awu": AWUScraper,
     "nrl": NRLScraper,
-    "assam_job_news": AssamJobNewsScraper
+    "assam_job_news": AssamJobNewsScraper,
+    
+    # 8 New Colleges/Universities
+    "darrang_college": DarrangCollegeScraper,
+    "tezpur_college": TezpurCollegeScraper,
+    "lokd_college": LOKDCollegeScraper,
+    "royal_global": RoyalGlobalScraper,
+    "ignou_guwahati": IGNOUGuwahatiScraper,
+    "don_bosco": DonBoscoScraper,
+    "pandu_college": PanduCollegeScraper,
+    "adtu": ADTUScraper
 }
 
 def main():

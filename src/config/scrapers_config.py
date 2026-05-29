@@ -234,5 +234,85 @@ SCRAPER_CONFIG = {
             "delay_seconds": 3.0,
             "jitter": True,
         }
+    },
+    "darrang_college": {
+        "frequency": "24h",
+        "timeout": 30,
+        "priority": "low",
+        "category": "academic",
+        "rate_limit": {
+            "delay_seconds": 2.0,
+            "jitter": True,
+        }
+    },
+    "tezpur_college": {
+        "frequency": "24h",
+        "timeout": 30,
+        "priority": "low",
+        "category": "academic",
+        "rate_limit": {
+            "delay_seconds": 2.0,
+            "jitter": True,
+        }
+    },
+    "lokd_college": {
+        "frequency": "24h",
+        "timeout": 30,
+        "priority": "low",
+        "category": "academic",
+        "rate_limit": {
+            "delay_seconds": 2.0,
+            "jitter": True,
+        }
+    },
+    "royal_global": {
+        "frequency": "24h",
+        "timeout": 30,
+        "priority": "low",
+        "category": "academic",
+        "rate_limit": {
+            "delay_seconds": 2.0,
+            "jitter": True,
+        }
+    },
+    "ignou_guwahati": {
+        "frequency": "24h",
+        "timeout": 30,
+        "priority": "low",
+        "category": "academic",
+        "rate_limit": {
+            "delay_seconds": 2.0,
+            "jitter": True,
+        }
+    },
+    "don_bosco": {
+        "frequency": "24h",
+        "timeout": 30,
+        "priority": "low",
+        "category": "academic",
+        "rate_limit": {
+            "delay_seconds": 2.0,
+            "jitter": True,
+        }
+    },
+    "pandu_college": {
+        "frequency": "24h",
+        "timeout": 30,
+        "priority": "low",
+        "category": "academic",
+        "rate_limit": {
+            "delay_seconds": 2.0,
+            "jitter": True,
+        }
+    },
+    "adtu": {
+        "frequency": "24h",
+        "timeout": 30,
+        "priority": "low",
+        "category": "academic",
+        "rate_limit": {
+            "delay_seconds": 2.0,
+            "jitter": True,
+        }
     }
 }

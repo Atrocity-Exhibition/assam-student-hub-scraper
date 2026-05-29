@@ -11,7 +11,8 @@ class AHSECScraper(BaseScraper):
         super().__init__(
             name="ahsec",
             institution="Assam Higher Secondary Education Council",
-            source="AHSEC Official"
+            source="AHSEC Official",
+            institution_slug="ahsec"
         )
         self.base_url = "https://ahsec.assam.gov.in"
         self.urls = ["https://ahsec.assam.gov.in/"]

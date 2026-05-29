@@ -19,7 +19,8 @@ class ASTUScraper(BaseScraper):
         super().__init__(
             name="astu",
             institution="Assam Science and Technology University",
-            source="ASTU"
+            source="ASTU",
+            institution_slug="astu"
         )
         self.pages = [
             ("https://astu.ac.in/?page_id=561", "notice"),       # News & Notifications

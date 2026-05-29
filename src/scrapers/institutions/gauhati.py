@@ -108,16 +108,24 @@ class GauhatiScraper(BaseScraper):
             notices.append(current_notice)
 
         # Build notice items
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
         for n in notices:
+            if len(items) >= 15:
+                break
+                
             title = n["title"]
             if not title:
                 self.logger.debug(f"Skipping notice with date {n['date']} but empty title")
                 continue
 
             posted_at = parse_date(n["date"])
-            if posted_at and posted_at.year < 2024:
-                self.logger.debug(f"Skipping stale notice from year {posted_at.year}: {title}")
-                continue
+            if posted_at:
+                posted_at_aware = posted_at if posted_at.tzinfo else posted_at.replace(tzinfo=timezone.utc)
+                age_days = (now - posted_at_aware).days
+                if age_days > 180:
+                    self.logger.debug(f"Skipping stale notice ({age_days} days old): {title}")
+                    continue
             
             # Determine URLs
             attachment_url = None

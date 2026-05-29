@@ -10,7 +10,8 @@ class SEBAScraper(BaseScraper):
         super().__init__(
             name="seba",
             institution="Board of Secondary Education, Assam",
-            source="SEBA Official"
+            source="SEBA Official",
+            institution_slug="seba"
         )
         self.base_url = "https://sebaonline.org"
         self.known_notices = [
