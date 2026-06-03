@@ -112,6 +112,8 @@ class SLPRBScraper(BaseScraper):
                 # Clean tags list
                 tags = sorted(list(set(clean_text(tag) for tag in tags if tag)))
 
+                description = f"SLPRB Recruitment Notice. Reference No: {advt_no}." if advt_no else "SLPRB Recruitment Notice."
+
                 # Formulate metadata
                 meta = {
                     "advertisement_no": advt_no,
@@ -122,8 +124,6 @@ class SLPRBScraper(BaseScraper):
                 }
                 extracted_meta = extract_fields_for_category(category, title, description)
                 meta.update(extracted_meta)
-
-                description = f"SLPRB Recruitment Notice. Reference No: {advt_no}." if advt_no else "SLPRB Recruitment Notice."
 
                 items.append({
                     "title": title,

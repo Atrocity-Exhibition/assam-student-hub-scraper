@@ -83,6 +83,9 @@ class KKHSOUScraper(BaseScraper):
                         if not posted_at:
                             posted_at = datetime.now(timezone.utc)
 
+                        if self.is_stale(posted_at):
+                            continue
+
                         # Clean and normalize title (strip "Posted on ..." metadata from title string)
                         title = row_text
                         title = re.sub(r"\s*\|\s*Posted\s+on\s*:.*$", "", title, flags=re.IGNORECASE)
