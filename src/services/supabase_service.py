@@ -75,18 +75,21 @@ def bulk_upsert_notices(items: List[ScrapedItem]) -> Dict[str, Any]:
     # Determine which ones already exist in the database (updates) and which ones are new (inserts)
     inserted_count = 0
     updated_count = 0
+    existing_by_url = {}
     try:
         urls = list(seen_urls)
-        existing_urls = set()
         for i in range(0, len(urls), 100):
             batch_urls = urls[i:i+100]
-            response_existing = supabase.table("notices").select("source_url").in_("source_url", batch_urls).execute()
+            response_existing = supabase.table("notices").select("source_url, posted_at, created_at").in_("source_url", batch_urls).execute()
             if response_existing.data:
                 for row in response_existing.data:
-                    existing_urls.add(row["source_url"])
+                    existing_by_url[row["source_url"]] = {
+                        "posted_at": row.get("posted_at"),
+                        "created_at": row.get("created_at")
+                    }
         
         for url in seen_urls:
-            if url in existing_urls:
+            if url in existing_by_url:
                 updated_count += 1
             else:
                 inserted_count += 1
@@ -135,6 +138,26 @@ def bulk_upsert_notices(items: List[ScrapedItem]) -> Dict[str, Any]:
         d = item.to_dict()
         d.pop("reliability_score", None)
         d.pop("canonical_url", None)
+        
+        # Preserve original posted_at for existing notices to prevent sliding/fallback date updates
+        if item.source_url in existing_by_url:
+            existing = existing_by_url[item.source_url]
+            db_posted_at = existing.get("posted_at")
+            db_created_at = existing.get("created_at")
+            
+            # Check if scraper's posted_at is a fallback to the scraping run time (within 5 minutes)
+            is_fallback = False
+            if item.posted_at and item.scraped_at:
+                is_fallback = abs((item.posted_at - item.scraped_at).total_seconds()) < 300
+                
+            if db_posted_at:
+                # If there's already a posted_at in the database, keep it
+                d["posted_at"] = db_posted_at
+            elif is_fallback and db_created_at:
+                # If database posted_at is null, but the scraper fell back to now(),
+                # use the original creation time (discovery time) instead of sliding forward.
+                d["posted_at"] = db_created_at
+                
         records.append(d)
     logger.info(f"Database Ingestion: Preparing bulk upsert for {len(records)} notices")
 
