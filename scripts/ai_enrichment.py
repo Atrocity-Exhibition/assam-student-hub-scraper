@@ -10,7 +10,9 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 from supabase import create_client
 import pypdf
-import google.generativeai as genai
+from google import genai
+from google.genai import types
+import tempfile
 
 # Setup Logger
 logging.basicConfig(
@@ -40,7 +42,7 @@ if not gemini_key:
 
 # Configure clients
 supabase = create_client(supabase_url, supabase_key)
-genai.configure(api_key=gemini_key)
+client = genai.Client(api_key=gemini_key)
 
 def is_placeholder_description(desc: str, title: str) -> bool:
     """
@@ -61,25 +63,34 @@ def is_placeholder_description(desc: str, title: str) -> bool:
     if desc_clean == f"Sourced from {title} announcement board.":
         return True
         
-    # If description is too short (repeats the title)
-    if len(desc_clean) < 120 and title.lower() in desc_clean.lower():
+    # If description is too short
+    if len(desc_clean) < 120:
         return True
         
     return False
 
-def extract_pdf_text(attachment_url: str) -> str:
+def extract_pdf_text(attachment_url: str) -> tuple[str, str | None]:
     """
-    Download PDF and extract text from the first 4 pages.
+    Download PDF, save to a temporary file, and extract text from the first 4 pages.
+    Returns a tuple of (extracted_text, temp_file_path).
     """
     logger.info(f"Downloading PDF from: {attachment_url}")
+    temp_file_path = None
     try:
-        response = requests.get(attachment_url, timeout=(8, 12))
+        # Disable SSL verification warnings as government servers often have self-signed certificates
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        response = requests.get(attachment_url, timeout=(8, 12), verify=False)
         if response.status_code != 200:
             logger.warning(f"Failed to download PDF. HTTP Status: {response.status_code}")
-            return ""
+            return "", None
             
-        pdf_file = io.BytesIO(response.content)
-        reader = pypdf.PdfReader(pdf_file)
+        # Write to a temporary file so Gemini Files API can ingest it if it is scanned
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(response.content)
+            temp_file_path = tmp.name
+            
+        reader = pypdf.PdfReader(temp_file_path)
         
         text_parts = []
         max_pages = min(4, len(reader.pages))
@@ -91,14 +102,14 @@ def extract_pdf_text(attachment_url: str) -> str:
                 text_parts.append(page_text)
                 
         full_text = "\n".join(text_parts).strip()
-        return full_text
+        return full_text, temp_file_path
     except Exception as e:
         logger.error(f"Error downloading or parsing PDF: {e}")
-        return ""
+        return "", temp_file_path
 
-def enrich_notice(notice: dict, pdf_text: str) -> bool:
+def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> bool:
     """
-    Send text to Google Gemini to get structured description and metadata,
+    Send text (or upload scanned PDF) to Google Gemini to get structured description and metadata,
     and update Supabase.
     """
     notice_id = notice["id"]
@@ -108,88 +119,177 @@ def enrich_notice(notice: dict, pdf_text: str) -> bool:
     logger.info(f"Enriching notice ID {notice_id}: '{title[:60]}...'")
     
     # Check if we have extracted text to parse.
-    # If PDF has no readable text (scanned image), use a title-based fallback prompt.
+    # If PDF has no readable text (scanned image), upload the file to Gemini if available.
     is_scanned = len(pdf_text) < 150
+    uploaded_file = None
     
-    if is_scanned:
-        logger.warning(f"PDF has negligible readable text ({len(pdf_text)} chars). Falling back to title-only extraction.")
-        prompt = f"""You are an expert assistant for a student and recruitment notices portal.
-        The attachment for the notice titled "{title}" (Category: {category}) is a scanned PDF image, so its text cannot be read directly.
-        
-        Based ONLY on the title, generate:
-        1. A professional, clean, and informative summary/description of 1 to 2 sentences suitable for a notification card.
-        2. Set all other metadata fields to null.
-        
-        Response format: You MUST respond with a valid JSON object matching this schema exactly:
-        {{
-          "description": "...",
-          "vacancies": null,
-          "qualification": null,
-          "last_date": null,
-          "salary": null,
-          "advt_no": null,
-          "age_limit": null,
-          "exam_date": null,
-          "admit_card_date": null,
-          "exam_mode": null,
-          "award_amount": null,
-          "level": null,
-          "application_mode": null
-        }}
-        """
-    else:
-        prompt = f"""You are an expert educational and recruitment notifications helper.
-        Analyze the following text extracted from an official notification document titled "{title}" (Category: {category}).
-        
-        Extract the following information:
-        1. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required. Do not include introductory text like "Here is a summary".
-        2. Important metadata fields matching these keys exactly:
-           - "vacancies": Total number of vacancies/posts/seats mentioned (integer or null).
-           - "qualification": Educational qualification requirements (short string under 100 chars, e.g. "Graduate in any discipline", "Class 12 passed", or null).
-           - "last_date": The final deadline/last date to apply in YYYY-MM-DD format (string or null).
-           - "salary": Salary/pay scale/stipend information (short string, e.g. "Rs. 14,000 - 60,500 + GP Rs. 8,700" or null).
-           - "advt_no": Advertisement reference number (string or null).
-           - "age_limit": Age eligibility criteria (short string, e.g. "18 - 40 years as of 01-01-2026" or null).
-           
-        If the category is "exam", also try to extract:
-           - "exam_date": The date of the examination (short string or null).
-           - "admit_card_date": The date of admit card release (short string or null).
-           - "exam_mode": Mode of exam (e.g. "OMR-based", "Written Test", "Computer Practical Test", or null).
-           
-        If the category is "scholarship", also try to extract:
-           - "award_amount": Financial award amount (short string, e.g. "Rs. 10,000 per annum" or null).
-           - "level": Level of study (e.g. "PG", "UG", "Class 11/12", or null).
-           - "application_mode": Mode of application (e.g. "Online via National Scholarship Portal", "Offline", or null).
-           
-        Response format: You MUST respond with a valid JSON object matching this schema exactly:
-        {{
-          "description": "...",
-          "vacancies": ...,
-          "qualification": ...,
-          "last_date": ...,
-          "salary": ...,
-          "advt_no": ...,
-          "age_limit": ...,
-          "exam_date": ...,
-          "admit_card_date": ...,
-          "exam_mode": ...,
-          "award_amount": ...,
-          "level": ...,
-          "application_mode": ...
-        }}
-        
-        Make sure all JSON keys are present. Set any fields that cannot be found to null.
-        
-        Document Text:
-        {pdf_text[:10000]}
-        """
-        
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        response = model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"}
-        )
+        if is_scanned and pdf_file_path and os.path.exists(pdf_file_path):
+            logger.info(f"PDF has negligible readable text ({len(pdf_text)} chars). Using multimodal upload.")
+            try:
+                uploaded_file = client.files.upload(file=pdf_file_path)
+                logger.info(f"Uploaded file to Gemini Files API: {uploaded_file.name}")
+                
+                # Wait for processing if necessary
+                import time
+                state = uploaded_file.state
+                while state.name == "PROCESSING":
+                    logger.info("Waiting for file to be processed...")
+                    time.sleep(2)
+                    uploaded_file = client.files.get(name=uploaded_file.name)
+                    state = uploaded_file.state
+                    
+                if state.name != "ACTIVE":
+                    raise Exception(f"File state is not ACTIVE: {state.name}")
+                    
+            except Exception as upload_err:
+                logger.warning(f"Failed to upload file to Gemini: {upload_err}. Falling back to title-only extraction.")
+                uploaded_file = None
+
+        if is_scanned and not uploaded_file:
+            logger.warning("Falling back to title-only description extraction (no multimodal upload available).")
+            prompt = f"""You are an expert assistant for a student and recruitment notices portal.
+            The attachment for the notice titled "{title}" (Category: {category}) is a scanned PDF image, so its text cannot be read directly.
+            
+            Based ONLY on the title, generate:
+            1. A professional, clean, and informative summary/description of 1 to 2 sentences suitable for a notification card.
+            2. Set all other metadata fields to null.
+            
+            Response format: You MUST respond with a valid JSON object matching this schema exactly:
+            {{
+              "description": "...",
+              "vacancies": null,
+              "qualification": null,
+              "last_date": null,
+              "salary": null,
+              "advt_no": null,
+              "age_limit": null,
+              "exam_date": null,
+              "admit_card_date": null,
+              "exam_mode": null,
+              "award_amount": null,
+              "level": null,
+              "application_mode": null
+            }}
+            """
+            contents = [prompt]
+        elif uploaded_file:
+            # Multimodal prompt with the uploaded file object
+            prompt = f"""You are an expert educational and recruitment notifications helper.
+            Analyze the attached official notification document titled "{title}" (Category: {category}).
+            
+            Since this document is a scanned image/PDF, visually read the document text and extract the following information:
+            1. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required. Do not include introductory text like "Here is a summary".
+            2. Important metadata fields matching these keys exactly:
+               - "vacancies": Total number of vacancies/posts/seats mentioned (integer or null).
+               - "qualification": Educational qualification requirements (short string under 100 chars, e.g. "Graduate in any discipline", "Class 12 passed", or null).
+               - "last_date": The final deadline/last date to apply in YYYY-MM-DD format (string or null).
+               - "salary": Salary/pay scale/stipend information (short string, e.g. "Rs. 14,000 - 60,500 + GP Rs. 8,700" or null).
+               - "advt_no": Advertisement reference number (string or null).
+               - "age_limit": Age eligibility criteria (short string, e.g. "18 - 40 years as of 01-01-2026" or null).
+               
+            If the category is "exam", also try to extract:
+               - "exam_date": The date of the examination (short string or null).
+               - "admit_card_date": The date of admit card release (short string or null).
+               - "exam_mode": Mode of exam (e.g. "OMR-based", "Written Test", "Computer Practical Test", or null).
+               
+            If the category is "scholarship", also try to extract:
+               - "award_amount": Financial award amount (short string, e.g. "Rs. 10,000 per annum" or null).
+               - "level": Level of study (e.g. "PG", "UG", "Class 11/12", or null).
+               - "application_mode": Mode of application (e.g. "Online via National Scholarship Portal", "Offline", or null).
+               
+            Response format: You MUST respond with a valid JSON object matching this schema exactly:
+            {{
+              "description": "...",
+              "vacancies": ...,
+              "qualification": ...,
+              "last_date": ...,
+              "salary": ...,
+              "advt_no": ...,
+              "age_limit": ...,
+              "exam_date": ...,
+              "admit_card_date": ...,
+              "exam_mode": ...,
+              "award_amount": ...,
+              "level": ...,
+              "application_mode": ...
+            }}
+            
+            Make sure all JSON keys are present. Set any fields that cannot be found to null.
+            """
+            contents = [uploaded_file, prompt]
+        else:
+            prompt = f"""You are an expert educational and recruitment notifications helper.
+            Analyze the following text extracted from an official notification document titled "{title}" (Category: {category}).
+            
+            Extract the following information:
+            1. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required. Do not include introductory text like "Here is a summary".
+            2. Important metadata fields matching these keys exactly:
+               - "vacancies": Total number of vacancies/posts/seats mentioned (integer or null).
+               - "qualification": Educational qualification requirements (short string under 100 chars, e.g. "Graduate in any discipline", "Class 12 passed", or null).
+               - "last_date": The final deadline/last date to apply in YYYY-MM-DD format (string or null).
+               - "salary": Salary/pay scale/stipend information (short string, e.g. "Rs. 14,000 - 60,500 + GP Rs. 8,700" or null).
+               - "advt_no": Advertisement reference number (string or null).
+               - "age_limit": Age eligibility criteria (short string, e.g. "18 - 40 years as of 01-01-2026" or null).
+               
+            If the category is "exam", also try to extract:
+               - "exam_date": The date of the examination (short string or null).
+               - "admit_card_date": The date of admit card release (short string or null).
+               - "exam_mode": Mode of exam (e.g. "OMR-based", "Written Test", "Computer Practical Test", or null).
+               
+            If the category is "scholarship", also try to extract:
+               - "award_amount": Financial award amount (short string, e.g. "Rs. 10,000 per annum" or null).
+               - "level": Level of study (e.g. "PG", "UG", "Class 11/12", or null).
+               - "application_mode": Mode of application (e.g. "Online via National Scholarship Portal", "Offline", or null).
+               
+            Response format: You MUST respond with a valid JSON object matching this schema exactly:
+            {{
+              "description": "...",
+              "vacancies": ...,
+              "qualification": ...,
+              "last_date": ...,
+              "salary": ...,
+              "advt_no": ...,
+              "age_limit": ...,
+              "exam_date": ...,
+              "admit_card_date": ...,
+              "exam_mode": ...,
+              "award_amount": ...,
+              "level": ...,
+              "application_mode": ...
+            }}
+            
+            Make sure all JSON keys are present. Set any fields that cannot be found to null.
+            
+            Document Text:
+            {pdf_text[:10000]}
+            """
+            contents = [prompt]
+            
+        # Call Gemini with a retry loop to handle temporary 503 or 429 errors
+        import time
+        max_retries = 3
+        backoff = 3
+        response = None
+        for attempt in range(max_retries):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-flash-latest",
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json"
+                    )
+                )
+                break
+            except Exception as gen_err:
+                err_msg = str(gen_err).lower()
+                is_retryable = any(x in err_msg for x in ["503", "429", "temporary", "demand", "unavailable", "exhausted"])
+                if is_retryable and attempt < max_retries - 1:
+                    sleep_time = backoff ** (attempt + 1)
+                    logger.warning(f"Gemini API error (Attempt {attempt+1}/{max_retries}): {gen_err}. Retrying in {sleep_time}s...")
+                    time.sleep(sleep_time)
+                else:
+                    raise gen_err
         
         ai_data = json.loads(response.text)
         description_ai = ai_data.get("description")
@@ -209,7 +309,10 @@ def enrich_notice(notice: dict, pdf_text: str) -> bool:
         # Mark as enriched
         current_metadata["ai_enriched"] = True
         if is_scanned:
-            current_metadata["ai_scanned_fallback"] = True
+            if uploaded_file:
+                current_metadata["ai_multimodal_extracted"] = True
+            else:
+                current_metadata["ai_scanned_fallback"] = True
             
         # Write back to Supabase
         update_data = {
@@ -218,9 +321,6 @@ def enrich_notice(notice: dict, pdf_text: str) -> bool:
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
         
-        # Parse last_date to update posted_at/deadline if suitable, or let it live in metadata
-        # (The frontend reads last_date directly from metadata)
-        
         supabase.table("notices").update(update_data).eq("id", notice_id).execute()
         logger.info(f"Successfully enriched Notice ID {notice_id}!")
         return True
@@ -228,6 +328,15 @@ def enrich_notice(notice: dict, pdf_text: str) -> bool:
     except Exception as e:
         logger.error(f"Failed to query Gemini or update Supabase: {e}")
         return False
+        
+    finally:
+        # Clean up the file from Gemini Files API if we uploaded one
+        if uploaded_file:
+            try:
+                client.files.delete(name=uploaded_file.name)
+                logger.info(f"Deleted PDF file from Gemini Files API: {uploaded_file.name}")
+            except Exception as cleanup_err:
+                logger.warning(f"Failed to delete file from Gemini Files API: {cleanup_err}")
 
 def main():
     parser = argparse.ArgumentParser(description="AssamStudentHub AI Notice Enricher using Google Gemini API")
@@ -282,10 +391,18 @@ def main():
         
         enriched_count = 0
         for notice in batch:
-            pdf_text = extract_pdf_text(notice["attachment_url"])
-            success = enrich_notice(notice, pdf_text)
-            if success:
-                enriched_count += 1
+            pdf_text, temp_file_path = extract_pdf_text(notice["attachment_url"])
+            try:
+                success = enrich_notice(notice, pdf_text, temp_file_path)
+                if success:
+                    enriched_count += 1
+            finally:
+                if temp_file_path and os.path.exists(temp_file_path):
+                    try:
+                        os.remove(temp_file_path)
+                        logger.info(f"Cleaned up local temporary file: {temp_file_path}")
+                    except Exception as e:
+                        logger.warning(f"Failed to remove local temporary file: {e}")
                 
         logger.info(f"Completed run. Successfully enriched {enriched_count} / {len(batch)} notices.")
         
