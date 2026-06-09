@@ -151,13 +151,17 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             prompt = f"""You are an expert assistant for a student and recruitment notices portal.
             The attachment for the notice titled "{title}" (Category: {category}) is a scanned PDF image, so its text cannot be read directly.
             
-            Based ONLY on the title, generate:
-            1. A professional, clean, and informative summary/description of 1 to 2 sentences suitable for a notification card.
-            2. Set all other metadata fields to null.
+            Based ONLY on the title:
+            1. Determine if the notice is relevant to students, scholars, or job seekers (e.g. recruitments, admissions, exams, scholarships, academic fees, application guidelines, routines, results). Set "is_relevant" to true. If it is irrelevant (e.g. tenders, procurement/quotation notices, administrative transfer or retirement orders, internal staff meetings, audit reports, employee holiday announcements), set "is_relevant" to false.
+            2. Provide a short reason in "relevance_reason".
+            3. Generate a professional, clean, and informative summary/description of 1 to 2 sentences suitable for a notification card.
+            4. Set all other metadata fields to null.
             
             Response format: You MUST respond with a valid JSON object matching this schema exactly:
             {{
               "description": "...",
+              "is_relevant": true/false,
+              "relevance_reason": "...",
               "vacancies": null,
               "qualification": null,
               "last_date": null,
@@ -179,8 +183,10 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             Analyze the attached official notification document titled "{title}" (Category: {category}).
             
             Since this document is a scanned image/PDF, visually read the document text and extract the following information:
-            1. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required. Do not include introductory text like "Here is a summary".
-            2. Important metadata fields matching these keys exactly:
+            1. Determine if the notice is relevant to students, scholars, or job seekers (e.g. recruitments, admissions, exams, scholarships, academic fees, application guidelines, routines, results). Set "is_relevant" to true. If it is irrelevant (e.g. tenders, procurement/quotation notices, administrative transfer or retirement orders, internal staff meetings, audit reports, employee holiday announcements), set "is_relevant" to false.
+            2. Provide a short reason in "relevance_reason".
+            3. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required.
+            4. Important metadata fields matching these keys exactly:
                - "vacancies": Total number of vacancies/posts/seats mentioned (integer or null).
                - "qualification": Educational qualification requirements (short string under 100 chars, e.g. "Graduate in any discipline", "Class 12 passed", or null).
                - "last_date": The final deadline/last date to apply in YYYY-MM-DD format (string or null).
@@ -201,6 +207,8 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             Response format: You MUST respond with a valid JSON object matching this schema exactly:
             {{
               "description": "...",
+              "is_relevant": true/false,
+              "relevance_reason": "...",
               "vacancies": ...,
               "qualification": ...,
               "last_date": ...,
@@ -223,8 +231,10 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             Analyze the following text extracted from an official notification document titled "{title}" (Category: {category}).
             
             Extract the following information:
-            1. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required. Do not include introductory text like "Here is a summary".
-            2. Important metadata fields matching these keys exactly:
+            1. Determine if the notice is relevant to students, scholars, or job seekers (e.g. recruitments, admissions, exams, scholarships, academic fees, application guidelines, routines, results). Set "is_relevant" to true. If it is irrelevant (e.g. tenders, procurement/quotation notices, administrative transfer or retirement orders, internal staff meetings, audit reports, employee holiday announcements), set "is_relevant" to false.
+            2. Provide a short reason in "relevance_reason".
+            3. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required.
+            4. Important metadata fields matching these keys exactly:
                - "vacancies": Total number of vacancies/posts/seats mentioned (integer or null).
                - "qualification": Educational qualification requirements (short string under 100 chars, e.g. "Graduate in any discipline", "Class 12 passed", or null).
                - "last_date": The final deadline/last date to apply in YYYY-MM-DD format (string or null).
@@ -245,6 +255,8 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             Response format: You MUST respond with a valid JSON object matching this schema exactly:
             {{
               "description": "...",
+              "is_relevant": true/false,
+              "relevance_reason": "...",
               "vacancies": ...,
               "qualification": ...,
               "last_date": ...,
@@ -266,30 +278,46 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             """
             contents = [prompt]
             
-        # Call Gemini with a retry loop to handle temporary 503 or 429 errors
+        # Call Gemini with a retry loop and fallback models to handle temporary 503 or 429 errors
         import time
-        max_retries = 3
-        backoff = 3
+        models_to_try = ["gemini-flash-latest", "gemini-2.5-flash-lite"]
         response = None
-        for attempt in range(max_retries):
-            try:
-                response = client.models.generate_content(
-                    model="gemini-flash-latest",
-                    contents=contents,
-                    config=types.GenerateContentConfig(
-                        response_mime_type="application/json"
+        last_exception = None
+        
+        for model_name in models_to_try:
+            logger.info(f"Attempting content generation using model: {model_name}")
+            max_retries = 3
+            backoff = 3
+            success = False
+            for attempt in range(max_retries):
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=contents,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json"
+                        )
                     )
-                )
+                    success = True
+                    break
+                except Exception as gen_err:
+                    last_exception = gen_err
+                    err_msg = str(gen_err).lower()
+                    is_retryable = any(x in err_msg for x in ["503", "429", "temporary", "demand", "unavailable", "exhausted"])
+                    if is_retryable and attempt < max_retries - 1:
+                        sleep_time = backoff ** (attempt + 1)
+                        logger.warning(f"Gemini API error for model {model_name} (Attempt {attempt+1}/{max_retries}): {gen_err}. Retrying in {sleep_time}s...")
+                        time.sleep(sleep_time)
+                    else:
+                        logger.warning(f"Model {model_name} failed with error: {gen_err}")
+                        break
+            if success:
                 break
-            except Exception as gen_err:
-                err_msg = str(gen_err).lower()
-                is_retryable = any(x in err_msg for x in ["503", "429", "temporary", "demand", "unavailable", "exhausted"])
-                if is_retryable and attempt < max_retries - 1:
-                    sleep_time = backoff ** (attempt + 1)
-                    logger.warning(f"Gemini API error (Attempt {attempt+1}/{max_retries}): {gen_err}. Retrying in {sleep_time}s...")
-                    time.sleep(sleep_time)
-                else:
-                    raise gen_err
+        else:
+            if last_exception:
+                raise last_exception
+            else:
+                raise Exception("All configured models failed to generate content.")
         
         ai_data = json.loads(response.text)
         description_ai = ai_data.get("description")
@@ -321,6 +349,12 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             "updated_at": datetime.now(timezone.utc).isoformat()
         }
         
+        # Check relevance
+        is_relevant = ai_data.get("is_relevant", True)
+        if is_relevant is False:
+            update_data["is_active"] = False
+            logger.info(f"Notice ID {notice_id} classified as IRRELEVANT (Reason: {ai_data.get('relevance_reason')}). Setting is_active = False.")
+            
         supabase.table("notices").update(update_data).eq("id", notice_id).execute()
         logger.info(f"Successfully enriched Notice ID {notice_id}!")
         return True
