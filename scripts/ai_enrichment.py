@@ -69,6 +69,23 @@ def is_placeholder_description(desc: str, title: str) -> bool:
         
     return False
 
+def is_generic_title(title: str) -> bool:
+    """
+    Check if the notice title is a generic word (e.g. "Notice", "Recruitment", "Tender").
+    """
+    t_clean = title.strip().lower()
+    t_clean = re.sub(r'[^\w\s]', '', t_clean)
+    generic_words = {
+        "notice", "notification", "recruitment", "tender", "quotation", "advertisement",
+        "advt", "circular", "news", "announcement", "result", "results", "admission",
+        "admissions", "exam", "exams", "examination", "examinations", "routines", "routine"
+    }
+    words = t_clean.split()
+    if len(words) <= 2:
+        if all(w in generic_words for w in words):
+            return True
+    return False
+
 def extract_pdf_text(attachment_url: str) -> tuple[str, str | None]:
     """
     Download PDF, save to a temporary file, and extract text from the first 4 pages.
@@ -154,12 +171,14 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             Based ONLY on the title:
             1. Determine if the notice is relevant to students, scholars, or job seekers (e.g. recruitments, admissions, exams, scholarships, academic fees, application guidelines, routines, results). Set "is_relevant" to true. If it is irrelevant (e.g. tenders, procurement/quotation notices, administrative transfer or retirement orders, internal staff meetings, audit reports, employee holiday announcements), set "is_relevant" to false.
             2. Provide a short reason in "relevance_reason".
-            3. Generate a professional, clean, and informative summary/description of 1 to 2 sentences suitable for a notification card.
-            4. Set all other metadata fields to null.
+            3. The notice title is "{title}". If it is a very generic word (e.g., just 'Notice' or 'Recruitment'), suggest a descriptive and clean title under 100 characters in the "refined_title" key. Otherwise, set "refined_title" to null.
+            4. Generate a professional, clean, and informative summary/description of 1 to 2 sentences suitable for a notification card.
+            5. Set all other metadata fields to null.
             
             Response format: You MUST respond with a valid JSON object matching this schema exactly:
             {{
               "description": "...",
+              "refined_title": "..." or null,
               "is_relevant": true/false,
               "relevance_reason": "...",
               "vacancies": null,
@@ -185,8 +204,9 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             Since this document is a scanned image/PDF, visually read the document text and extract the following information:
             1. Determine if the notice is relevant to students, scholars, or job seekers (e.g. recruitments, admissions, exams, scholarships, academic fees, application guidelines, routines, results). Set "is_relevant" to true. If it is irrelevant (e.g. tenders, procurement/quotation notices, administrative transfer or retirement orders, internal staff meetings, audit reports, employee holiday announcements), set "is_relevant" to false.
             2. Provide a short reason in "relevance_reason".
-            3. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required.
-            4. Important metadata fields matching these keys exactly:
+            3. The notice title is "{title}". If it is a very generic word (e.g., just 'Notice' or 'Recruitment'), suggest a descriptive and clean title under 100 characters in the "refined_title" key based on the document contents. Otherwise, set "refined_title" to null.
+            4. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required.
+            5. Important metadata fields matching these keys exactly:
                - "vacancies": Total number of vacancies/posts/seats mentioned (integer or null).
                - "qualification": Educational qualification requirements (short string under 100 chars, e.g. "Graduate in any discipline", "Class 12 passed", or null).
                - "last_date": The final deadline/last date to apply in YYYY-MM-DD format (string or null).
@@ -207,6 +227,7 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             Response format: You MUST respond with a valid JSON object matching this schema exactly:
             {{
               "description": "...",
+              "refined_title": "..." or null,
               "is_relevant": true/false,
               "relevance_reason": "...",
               "vacancies": ...,
@@ -233,8 +254,9 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             Extract the following information:
             1. Determine if the notice is relevant to students, scholars, or job seekers (e.g. recruitments, admissions, exams, scholarships, academic fees, application guidelines, routines, results). Set "is_relevant" to true. If it is irrelevant (e.g. tenders, procurement/quotation notices, administrative transfer or retirement orders, internal staff meetings, audit reports, employee holiday announcements), set "is_relevant" to false.
             2. Provide a short reason in "relevance_reason".
-            3. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required.
-            4. Important metadata fields matching these keys exactly:
+            3. The notice title is "{title}". If it is a very generic word (e.g., just 'Notice' or 'Recruitment'), suggest a descriptive and clean title under 100 characters in the "refined_title" key based on the document contents. Otherwise, set "refined_title" to null.
+            4. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required.
+            5. Important metadata fields matching these keys exactly:
                - "vacancies": Total number of vacancies/posts/seats mentioned (integer or null).
                - "qualification": Educational qualification requirements (short string under 100 chars, e.g. "Graduate in any discipline", "Class 12 passed", or null).
                - "last_date": The final deadline/last date to apply in YYYY-MM-DD format (string or null).
@@ -255,6 +277,7 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             Response format: You MUST respond with a valid JSON object matching this schema exactly:
             {{
               "description": "...",
+              "refined_title": "..." or null,
               "is_relevant": true/false,
               "relevance_reason": "...",
               "vacancies": ...,
@@ -280,7 +303,13 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             
         # Call Gemini with a retry loop and fallback models to handle temporary 503 or 429 errors
         import time
-        models_to_try = ["gemini-flash-latest", "gemini-2.5-flash-lite"]
+        models_to_try = [
+            "gemini-2.5-flash",
+            "gemini-3.1-flash-lite",
+            "gemini-flash-lite-latest",
+            "gemini-2.5-flash-lite",
+            "gemini-flash-latest"
+        ]
         response = None
         last_exception = None
         
@@ -355,6 +384,12 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             update_data["is_active"] = False
             logger.info(f"Notice ID {notice_id} classified as IRRELEVANT (Reason: {ai_data.get('relevance_reason')}). Setting is_active = False.")
             
+        # Check title refinement
+        refined_title = ai_data.get("refined_title")
+        if refined_title and len(refined_title.strip()) > 5:
+            update_data["title"] = refined_title.strip()
+            logger.info(f"Notice ID {notice_id} title refined from '{title}' to '{refined_title.strip()}'")
+            
         supabase.table("notices").update(update_data).eq("id", notice_id).execute()
         logger.info(f"Successfully enriched Notice ID {notice_id}!")
         return True
@@ -397,11 +432,6 @@ def main():
         # Filter notices needing enrichment in Python
         to_enrich = []
         for notice in all_notices:
-            url = notice.get("attachment_url")
-            # Must have a valid HTTP PDF attachment
-            if not url or not url.lower().startswith("http") or not url.lower().endswith(".pdf"):
-                continue
-                
             metadata = notice.get("metadata") or {}
             # Skip if already enriched
             if metadata.get("ai_enriched") is True:
@@ -425,7 +455,12 @@ def main():
         
         enriched_count = 0
         for notice in batch:
-            pdf_text, temp_file_path = extract_pdf_text(notice["attachment_url"])
+            url = notice.get("attachment_url")
+            pdf_text = ""
+            temp_file_path = None
+            if url and url.lower().startswith("http") and url.lower().endswith(".pdf"):
+                pdf_text, temp_file_path = extract_pdf_text(url)
+                
             try:
                 success = enrich_notice(notice, pdf_text, temp_file_path)
                 if success:
