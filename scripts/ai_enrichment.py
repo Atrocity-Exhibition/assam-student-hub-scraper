@@ -67,13 +67,47 @@ def is_placeholder_description(desc: str, title: str) -> bool:
     # Check common placeholder patterns
     if desc_clean.startswith("Official update from"):
         return True
+    if desc_clean.startswith("Official recruitment notice/order from"):
+        return True
+    if desc_clean.startswith("Official notification from"):
+        return True
     if "Please refer to the notice details page or attachment" in desc_clean:
         return True
     if desc_clean == f"Sourced from {title} announcement board.":
         return True
         
+    # If the title is copy-pasted into the description with a short template wrapper
+    if title and title in desc_clean:
+        # Subtract the title length and check if the remaining boilerplate is short
+        boilerplate_len = len(desc_clean) - len(title)
+        if boilerplate_len < 100:
+            return True
+            
     # If description is too short
     if len(desc_clean) < 120:
+        return True
+        
+    return False
+
+def needs_title_refinement(title: str) -> bool:
+    """
+    Check if the notice title is messy (all-caps, generic, or contains Click Here tags).
+    """
+    if not title:
+        return True
+    t_clean = title.strip()
+    
+    # Check if title is in ALL CAPS and is long enough (ignore small acronyms)
+    if t_clean.isupper() and len(t_clean) > 8:
+        return True
+        
+    # Check if title contains action/link tags
+    t_lower = t_clean.lower()
+    if "click here" in t_lower:
+        return True
+        
+    # Check if generic title
+    if is_generic_title(title):
         return True
         
     return False
@@ -180,7 +214,7 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             Based ONLY on the title:
             1. Determine if the notice is relevant to students, scholars, or job seekers (e.g. recruitments, admissions, exams, scholarships, academic fees, application guidelines, routines, results). Set "is_relevant" to true. If it is irrelevant (e.g. tenders, procurement/quotation notices, administrative transfer or retirement orders, internal staff meetings, audit reports, employee holiday announcements), set "is_relevant" to false.
             2. Provide a short reason in "relevance_reason".
-            3. The notice title is "{title}". If it is a very generic word (e.g., just 'Notice' or 'Recruitment'), suggest a descriptive and clean title under 100 characters in the "refined_title" key. Otherwise, set "refined_title" to null.
+            3. The notice title is "{title}". If it is a very generic word (e.g. 'Notice' or 'Recruitment'), is in ALL CAPS, contains words like 'Click here to Apply', or is poorly formatted, suggest a clean, properly cased (Title Case), and descriptive title under 100 characters in the "refined_title" key. Otherwise, set "refined_title" to null.
             4. Generate a professional, clean, and informative summary/description of 1 to 2 sentences suitable for a notification card.
             5. Set all other metadata fields to null.
             
@@ -213,7 +247,7 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             Since this document is a scanned image/PDF, visually read the document text and extract the following information:
             1. Determine if the notice is relevant to students, scholars, or job seekers (e.g. recruitments, admissions, exams, scholarships, academic fees, application guidelines, routines, results). Set "is_relevant" to true. If it is irrelevant (e.g. tenders, procurement/quotation notices, administrative transfer or retirement orders, internal staff meetings, audit reports, employee holiday announcements), set "is_relevant" to false.
             2. Provide a short reason in "relevance_reason".
-            3. The notice title is "{title}". If it is a very generic word (e.g., just 'Notice' or 'Recruitment'), suggest a descriptive and clean title under 100 characters in the "refined_title" key based on the document contents. Otherwise, set "refined_title" to null.
+            3. The notice title is "{title}". If it is a very generic word (e.g. 'Notice' or 'Recruitment'), is in ALL CAPS, contains words like 'Click here to Apply', or is poorly formatted, suggest a clean, properly cased (Title Case), and descriptive title under 100 characters in the "refined_title" key based on the document contents. Otherwise, set "refined_title" to null.
             4. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required.
             5. Important metadata fields matching these keys exactly:
                - "vacancies": Total number of vacancies/posts/seats mentioned (integer or null).
@@ -263,7 +297,7 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             Extract the following information:
             1. Determine if the notice is relevant to students, scholars, or job seekers (e.g. recruitments, admissions, exams, scholarships, academic fees, application guidelines, routines, results). Set "is_relevant" to true. If it is irrelevant (e.g. tenders, procurement/quotation notices, administrative transfer or retirement orders, internal staff meetings, audit reports, employee holiday announcements), set "is_relevant" to false.
             2. Provide a short reason in "relevance_reason".
-            3. The notice title is "{title}". If it is a very generic word (e.g., just 'Notice' or 'Recruitment'), suggest a descriptive and clean title under 100 characters in the "refined_title" key based on the document contents. Otherwise, set "refined_title" to null.
+            3. The notice title is "{title}". If it is a very generic word (e.g. 'Notice' or 'Recruitment'), is in ALL CAPS, contains words like 'Click here to Apply', or is poorly formatted, suggest a clean, properly cased (Title Case), and descriptive title under 100 characters in the "refined_title" key based on the document contents. Otherwise, set "refined_title" to null.
             4. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required.
             5. Important metadata fields matching these keys exactly:
                - "vacancies": Total number of vacancies/posts/seats mentioned (integer or null).
@@ -454,10 +488,10 @@ def main():
             if metadata.get("ai_enriched") is True:
                 continue
                 
-            # Check description is placeholder
+            # Check description is placeholder or title needs refinement
             desc = notice.get("description")
             title = notice.get("title", "")
-            if is_placeholder_description(desc, title):
+            if is_placeholder_description(desc, title) or needs_title_refinement(title):
                 to_enrich.append(notice)
                 
         logger.info(f"Found {len(to_enrich)} notices eligible for AI enrichment.")
