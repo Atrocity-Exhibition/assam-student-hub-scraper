@@ -44,6 +44,15 @@ if not gemini_key:
 supabase = create_client(supabase_url, supabase_key)
 client = genai.Client(api_key=gemini_key)
 
+# Global list of available models. Models that hit their daily limit will be removed dynamically.
+AVAILABLE_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-lite-latest",
+    "gemini-2.5-flash-lite",
+    "gemini-flash-latest"
+]
+
 def is_placeholder_description(desc: str, title: str) -> bool:
     """
     Check if the existing description is a placeholder or generic text.
@@ -303,17 +312,17 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             
         # Call Gemini with a retry loop and fallback models to handle temporary 503 or 429 errors
         import time
-        models_to_try = [
-            "gemini-2.5-flash",
-            "gemini-3.1-flash-lite",
-            "gemini-flash-lite-latest",
-            "gemini-2.5-flash-lite",
-            "gemini-flash-latest"
-        ]
+        global AVAILABLE_MODELS
+        
+        # Copy list to iterate safely
+        models_to_try = list(AVAILABLE_MODELS)
         response = None
         last_exception = None
         
         for model_name in models_to_try:
+            if model_name not in AVAILABLE_MODELS:
+                continue
+                
             logger.info(f"Attempting content generation using model: {model_name}")
             max_retries = 3
             backoff = 3
@@ -332,6 +341,14 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
                 except Exception as gen_err:
                     last_exception = gen_err
                     err_msg = str(gen_err).lower()
+                    
+                    # If this model has hit its daily free-tier limit, blacklist it immediately
+                    if "generaterequestsperday" in err_msg or "daily" in err_msg or "limit: 20" in err_msg or "limit: 0" in err_msg:
+                        logger.warning(f"Model {model_name} hit daily quota limit. Removing from available models.")
+                        if model_name in AVAILABLE_MODELS:
+                            AVAILABLE_MODELS.remove(model_name)
+                        break
+                        
                     is_retryable = any(x in err_msg for x in ["503", "429", "temporary", "demand", "unavailable", "exhausted"])
                     if is_retryable and attempt < max_retries - 1:
                         sleep_time = backoff ** (attempt + 1)
