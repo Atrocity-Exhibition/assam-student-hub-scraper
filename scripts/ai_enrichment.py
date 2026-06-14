@@ -167,6 +167,57 @@ def extract_pdf_text(attachment_url: str) -> tuple[str, str | None]:
         logger.error(f"Error downloading or parsing PDF: {e}")
         return "", temp_file_path
 
+def extract_webpage_text(url: str) -> str:
+    """
+    Fetch the webpage HTML and extract plain text content, stripping code and navigation elements.
+    """
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code != 200:
+            logger.warning(f"Failed to fetch webpage text from {url}: HTTP {response.status_code}")
+            return ""
+            
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(response.text, "html.parser")
+        
+        # Strip script, style, head, nav, footer, header, aside elements first
+        for element in soup(["script", "style", "head", "nav", "footer", "header", "aside"]):
+            element.decompose()
+            
+        # Convert hyperlinks to plain text with the URL so Gemini can read and extract them
+        for a in soup.find_all("a", href=True):
+            href = a["href"].strip()
+            if (href.startswith("http") or href.startswith("/")) and not href.startswith("#") and not href.startswith("javascript:"):
+                if href.startswith("/"):
+                    from urllib.parse import urljoin
+                    href = urljoin(url, href)
+                
+                # Exclude social media share links
+                social_domains = [
+                    "facebook.com", "twitter.com", "instagram.com", "youtube.com", "pinterest.com",
+                    "telegram.me", "t.me", "whatsapp.com", "linkedin.com", "reddit.com", "x.com"
+                ]
+                if not any(domain in href.lower() for domain in social_domains):
+                    link_text = a.get_text(strip=True)
+                    if link_text:
+                        a.replace_with(f" {link_text} (Link: {href}) ")
+            
+        # Get plain text
+        text = soup.get_text(separator=" ")
+        
+        # Clean up whitespace
+        lines = (line.strip() for line in text.splitlines())
+        chunks = (phrase for line in lines for phrase in line.split("  "))
+        clean_text = "\n".join(chunk for chunk in chunks if chunk)
+        
+        return clean_text[:12000]
+    except Exception as e:
+        logger.warning(f"Error extracting webpage text from {url}: {e}")
+        return ""
+
 def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> bool:
     """
     Send text (or upload scanned PDF) to Google Gemini to get structured description and metadata,
@@ -230,6 +281,7 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
               "salary": null,
               "advt_no": null,
               "age_limit": null,
+              "apply_url": null,
               "exam_date": null,
               "admit_card_date": null,
               "exam_mode": null,
@@ -248,7 +300,14 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             1. Determine if the notice is relevant to students, scholars, or job seekers (e.g. recruitments, admissions, exams, scholarships, academic fees, application guidelines, routines, results). Set "is_relevant" to true. If it is irrelevant (e.g. tenders, procurement/quotation notices, administrative transfer or retirement orders, internal staff meetings, audit reports, employee holiday announcements), set "is_relevant" to false.
             2. Provide a short reason in "relevance_reason".
             3. The notice title is "{title}". If it is a very generic word (e.g. 'Notice' or 'Recruitment'), is in ALL CAPS, contains words like 'Click here to Apply', or is poorly formatted, suggest a clean, properly cased (Title Case), and descriptive title under 100 characters in the "refined_title" key based on the document contents. Otherwise, set "refined_title" to null.
-            4. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required.
+            4. Generate a comprehensive, detailed, and formatted plain-text description of the announcement. This should NOT be a brief summary. Write a detailed post using clear headings, bullet points, and spacing. Include sections:
+               - Overview: A thorough summary of the notification.
+               - Important Dates: Complete list of deadlines, exam dates, admit card dates.
+               - Vacancies & Pay Scale: Total vacancies, category/post breakdown, pay matrix level, and allowances/benefits (DA, HRA, TA, medical benefits, etc.) if mentioned.
+               - Eligibility Criteria: Detailed educational qualifications, age limits, and technical requirements (e.g. minimum GATE scores, accepted papers).
+               - Selection Process: How candidates are selected (e.g. GATE score, written exam, interview).
+               - How to Apply: Step-by-step physical or online application instructions.
+               Translate any tables from the document into clean, readable text lists or structured text tables. Ensure no crucial information from the source text is omitted.
             5. Important metadata fields matching these keys exactly:
                - "vacancies": Total number of vacancies/posts/seats mentioned (integer or null).
                - "qualification": Educational qualification requirements (short string under 100 chars, e.g. "Graduate in any discipline", "Class 12 passed", or null).
@@ -256,6 +315,7 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
                - "salary": Salary/pay scale/stipend information (short string, e.g. "Rs. 14,000 - 60,500 + GP Rs. 8,700" or null).
                - "advt_no": Advertisement reference number (string or null).
                - "age_limit": Age eligibility criteria (short string, e.g. "18 - 40 years as of 01-01-2026" or null).
+               - "apply_url": The actual official application, registration, or login URL (string or null) extracted from the document text. Look for URLs associated with phrases like "Apply Online", "Online Application Link", "Registration Link", "Official Website", etc. DO NOT return URLs that point back to aggregator domains (like `alljobassam.com`, `dailyassamjob.com`, `assamcareer.com`, `assamjobnews.com`, etc.) or social media domains. Only return the actual official portal or government application link.
                
             If the category is "exam", also try to extract:
                - "exam_date": The date of the examination (short string or null).
@@ -279,6 +339,7 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
               "salary": ...,
               "advt_no": ...,
               "age_limit": ...,
+              "apply_url": ...,
               "exam_date": ...,
               "admit_card_date": ...,
               "exam_mode": ...,
@@ -298,7 +359,14 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             1. Determine if the notice is relevant to students, scholars, or job seekers (e.g. recruitments, admissions, exams, scholarships, academic fees, application guidelines, routines, results). Set "is_relevant" to true. If it is irrelevant (e.g. tenders, procurement/quotation notices, administrative transfer or retirement orders, internal staff meetings, audit reports, employee holiday announcements), set "is_relevant" to false.
             2. Provide a short reason in "relevance_reason".
             3. The notice title is "{title}". If it is a very generic word (e.g. 'Notice' or 'Recruitment'), is in ALL CAPS, contains words like 'Click here to Apply', or is poorly formatted, suggest a clean, properly cased (Title Case), and descriptive title under 100 characters in the "refined_title" key based on the document contents. Otherwise, set "refined_title" to null.
-            4. A professional, clean, and informative summary/description of 2 to 3 sentences suitable for a notification card on a student portal. Summarize what the notice is, who it is for, and key actions required.
+            4. Generate a comprehensive, detailed, and formatted plain-text description of the announcement. This should NOT be a brief summary. Write a detailed post using clear headings, bullet points, and spacing. Include sections:
+               - Overview: A thorough summary of the notification.
+               - Important Dates: Complete list of deadlines, exam dates, admit card dates.
+               - Vacancies & Pay Scale: Total vacancies, category/post breakdown, pay matrix level, and allowances/benefits (DA, HRA, TA, medical benefits, etc.) if mentioned.
+               - Eligibility Criteria: Detailed educational qualifications, age limits, and technical requirements (e.g. minimum GATE scores, accepted papers).
+               - Selection Process: How candidates are selected (e.g. GATE score, written exam, interview).
+               - How to Apply: Step-by-step physical or online application instructions.
+               Translate any tables from the document into clean, readable text lists or structured text tables. Ensure no crucial information from the source text is omitted.
             5. Important metadata fields matching these keys exactly:
                - "vacancies": Total number of vacancies/posts/seats mentioned (integer or null).
                - "qualification": Educational qualification requirements (short string under 100 chars, e.g. "Graduate in any discipline", "Class 12 passed", or null).
@@ -306,6 +374,7 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
                - "salary": Salary/pay scale/stipend information (short string, e.g. "Rs. 14,000 - 60,500 + GP Rs. 8,700" or null).
                - "advt_no": Advertisement reference number (string or null).
                - "age_limit": Age eligibility criteria (short string, e.g. "18 - 40 years as of 01-01-2026" or null).
+               - "apply_url": The actual official application, registration, or login URL (string or null) extracted from the document text. Look for URLs associated with phrases like "Apply Online", "Online Application Link", "Registration Link", "Official Website", etc. DO NOT return URLs that point back to aggregator domains (like `alljobassam.com`, `dailyassamjob.com`, `assamcareer.com`, `assamjobnews.com`, etc.) or social media domains. Only return the actual official portal or government application link.
                
             If the category is "exam", also try to extract:
                - "exam_date": The date of the examination (short string or null).
@@ -329,6 +398,7 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
               "salary": ...,
               "advt_no": ...,
               "age_limit": ...,
+              "apply_url": ...,
               "exam_date": ...,
               "admit_card_date": ...,
               "exam_mode": ...,
@@ -473,7 +543,7 @@ def main():
     # Query active notices with attachments
     try:
         response = supabase.table("notices")\
-            .select("id, title, description, category, attachment_url, metadata")\
+            .select("id, title, description, category, attachment_url, source_url, metadata")\
             .eq("is_active", True)\
             .execute()
             
@@ -507,10 +577,19 @@ def main():
         enriched_count = 0
         for notice in batch:
             url = notice.get("attachment_url")
+            source_url = notice.get("source_url")
             pdf_text = ""
             temp_file_path = None
             if url and url.lower().startswith("http") and url.lower().endswith(".pdf"):
                 pdf_text, temp_file_path = extract_pdf_text(url)
+                
+            # Fallback to scraping webpage text if PDF extraction yields nothing and source_url is available
+            if len(pdf_text) < 150 and source_url and source_url.lower().startswith("http"):
+                logger.info(f"Extracting webpage text from source URL: {source_url}")
+                web_text = extract_webpage_text(source_url)
+                if len(web_text) > 150:
+                    pdf_text = web_text
+                    logger.info(f"Successfully scraped {len(web_text)} characters of text from webpage.")
                 
             try:
                 success = enrich_notice(notice, pdf_text, temp_file_path)
