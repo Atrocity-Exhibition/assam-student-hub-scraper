@@ -46,8 +46,13 @@ def parse_date(date_str: str) -> Optional[datetime]:
         return None
         
     try:
-        # Fuzzy parsing handles different formats automatically. Prioritize Day-first for Indian sites (DD-MM-YYYY)
-        dt = dateutil.parser.parse(cleaned, fuzzy=True, dayfirst=True)
+        # Check if year-first ISO format (e.g. YYYY-MM-DD or YYYY/MM/DD)
+        year_first = False
+        if re.match(r'^\s*\d{4}[-/.]\d{1,2}[-/.]\d{1,2}', cleaned):
+            year_first = True
+            
+        # Prioritize Day-first for Indian sites (DD-MM-YYYY) unless it's a year-first format
+        dt = dateutil.parser.parse(cleaned, fuzzy=True, dayfirst=not year_first)
         # Force timezone-aware UTC
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
