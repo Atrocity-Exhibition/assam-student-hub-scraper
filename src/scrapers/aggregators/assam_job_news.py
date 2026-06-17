@@ -19,7 +19,8 @@ class AssamJobNewsScraper(BaseScraper):
         super().__init__(
             name="assam_job_news",
             institution="assamJOBnews",
-            source="assamJOBnews"
+            source="assamJOBnews",
+            institution_slug="assamjobnews"
         )
         self.feed_url = "https://www.assamjobnews.in/feeds/posts/default?alt=json"
 

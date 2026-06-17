@@ -15,7 +15,8 @@ class GauhatiScraper(BaseScraper):
         super().__init__(
             name="gauhati",
             institution="Gauhati University",
-            source="Gauhati University"
+            source="Gauhati University",
+            institution_slug="gauhati-university"
         )
         self.exam_url = "https://sites.google.com/a/gauhati.ac.in/notifications/examination"
         self.recruitment_url = "https://sites.google.com/a/gauhati.ac.in/notifications/recruitment/recruitment"

@@ -17,7 +17,8 @@ class CottonScraper(BaseScraper):
         super().__init__(
             name="cotton",
             institution="Cotton University",
-            source="Cotton University"
+            source="Cotton University",
+            institution_slug="cotton-university"
         )
         self.limit = limit
         self.base_url = "https://cottonuniversity.ac.in/"

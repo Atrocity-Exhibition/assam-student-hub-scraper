@@ -30,7 +30,8 @@ class AESRBScraper(BaseScraper):
         super().__init__(
             name="aesrb",
             institution="Assam Engineering Service Recruitment Board",
-            source="AESRB Official"
+            source="AESRB Official",
+            institution_slug="aesrb"
         )
         self.website_url = "https://www.aesrb.in"
 

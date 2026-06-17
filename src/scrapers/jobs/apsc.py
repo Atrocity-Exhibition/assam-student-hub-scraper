@@ -13,7 +13,11 @@ class APSCScraper(BaseScraper):
         Initialize the APSC Scraper.
         :param year: Optional calendar year to scrape. Defaults to current year.
         """
-        super().__init__("apsc", "Assam Public Service Commission")
+        super().__init__(
+            name="apsc",
+            institution="Assam Public Service Commission",
+            institution_slug="assam-public-service-commission"
+        )
         self.year = year
         self.base_url = "https://apsc.nic.in"
 

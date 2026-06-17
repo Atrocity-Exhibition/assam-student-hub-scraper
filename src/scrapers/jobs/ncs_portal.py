@@ -9,7 +9,8 @@ class NCSPortalScraper(BaseScraper):
         super().__init__(
             name="ncs_portal",
             institution="National Career Service",
-            source="NCS Portal"
+            source="NCS Portal",
+            institution_slug="ncs-portal"
         )
         self.api_endpoints = [
             "https://www.ncs.gov.in/_vti_bin/NCS/JobSearch.svc/SearchJobs",

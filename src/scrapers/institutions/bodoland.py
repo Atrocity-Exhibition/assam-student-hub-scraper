@@ -11,7 +11,8 @@ class BodolandScraper(BaseScraper):
         super().__init__(
             name="bodoland",
             institution="Bodoland University",
-            source="Bodoland University"
+            source="Bodoland University",
+            institution_slug="bodoland-university"
         )
         self.base_url = "https://www.buniv.edu.in"
         self.urls = ["https://www.buniv.edu.in/", "http://www.buniv.edu.in/"]

@@ -11,7 +11,8 @@ class TezpurScraper(BaseScraper):
         super().__init__(
             name="tezpur",
             institution="Tezpur University",
-            source="Tezpur University"
+            source="Tezpur University",
+            institution_slug="tezpur-university"
         )
         self.base_url = "https://www.tezu.ernet.in"
         self.pages = [

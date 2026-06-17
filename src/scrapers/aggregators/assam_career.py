@@ -10,7 +10,8 @@ class AssamCareerScraper(BaseScraper):
         super().__init__(
             name="assam_career",
             institution="Assam Career",
-            source="AssamCareer.com"
+            source="AssamCareer.com",
+            institution_slug="assam-career"
         )
         self.pages = [
             "https://www.assamcareer.com/",

@@ -20,7 +20,8 @@ class KKHSOUScraper(BaseScraper):
         super().__init__(
             name="kkhsou",
             institution="Krishna Kanta Handiqui State Open University",
-            source="KKHSOU"
+            source="KKHSOU",
+            institution_slug="krishna-kanta-handiqui-state-open-university"
         )
         # Use precise paths seeded from index research
         self.categories = [

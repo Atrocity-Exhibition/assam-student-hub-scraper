@@ -61,7 +61,8 @@ class NHMAssamScraper(BaseScraper):
         super().__init__(
             name="nhm_assam",
             institution="National Health Mission, Assam",
-            source="NHM Assam Official"
+            source="NHM Assam Official",
+            institution_slug="nhm-assam"
         )
         self.recruitment_url = "https://nhm.assam.gov.in/portlets/recruitment"
 

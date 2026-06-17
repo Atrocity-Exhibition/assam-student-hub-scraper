@@ -12,7 +12,12 @@ class SLPRBScraper(BaseScraper):
         """
         Initialize the State Level Police Recruitment Board (SLPRB) Scraper.
         """
-        super().__init__("slprb", "State Level Police Recruitment Board", "SLPRB")
+        super().__init__(
+            name="slprb",
+            institution="State Level Police Recruitment Board",
+            source="SLPRB",
+            institution_slug="state-level-police-recruitment-board"
+        )
         self.base_url = "https://slprbassam.in"
 
     def scrape(self) -> List[Dict[str, Any]]:

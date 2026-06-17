@@ -187,8 +187,23 @@ def extract_webpage_text(url: str) -> str:
         for element in soup(["script", "style", "head", "nav", "footer", "header", "aside"]):
             element.decompose()
             
+        # Find main content container if possible to reduce global page navigation noise and spam links
+        content_selectors = [
+            "article", "div.entry-content", "div.post-content", "div.post_content", 
+            "div.excerpt", "div.post_item", "div.content", "main", "div.main-content"
+        ]
+        target_soup = soup
+        for selector in content_selectors:
+            found = soup.select_one(selector)
+            if found:
+                text_len = len(found.get_text(strip=True))
+                if text_len > 100:
+                    target_soup = found
+                    logger.info(f"Extracting content from selector: {selector} (length: {text_len})")
+                    break
+
         # Convert hyperlinks to plain text with the URL so Gemini can read and extract them
-        for a in soup.find_all("a", href=True):
+        for a in target_soup.find_all("a", href=True):
             href = a["href"].strip()
             if (href.startswith("http") or href.startswith("/")) and not href.startswith("#") and not href.startswith("javascript:"):
                 if href.startswith("/"):
@@ -206,7 +221,7 @@ def extract_webpage_text(url: str) -> str:
                         a.replace_with(f" {link_text} (Link: {href}) ")
             
         # Get plain text
-        text = soup.get_text(separator=" ")
+        text = target_soup.get_text(separator=" ")
         
         # Clean up whitespace
         lines = (line.strip() for line in text.splitlines())

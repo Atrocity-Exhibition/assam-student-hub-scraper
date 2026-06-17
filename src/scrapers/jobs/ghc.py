@@ -19,7 +19,8 @@ class GHCScraper(BaseScraper):
         super().__init__(
             name="ghc",
             institution="Gauhati High Court",
-            source="Gauhati High Court"
+            source="Gauhati High Court",
+            institution_slug="gauhati-high-court"
         )
         self.target_url = "https://ghconline.gov.in/index.php/recruitment-notices/"
 

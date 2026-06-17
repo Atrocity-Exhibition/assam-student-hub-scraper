@@ -21,7 +21,8 @@ class AWUScraper(BaseScraper):
         super().__init__(
             name="awu",
             institution="Assam Women's University",
-            source="AWU"
+            source="AWU",
+            institution_slug="assam-womens-university"
         )
         self.api_url = "https://admission.awu.ac.in/api/public-notifications"
         # Map original API types to standard category terms

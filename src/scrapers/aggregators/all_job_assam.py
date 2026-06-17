@@ -18,8 +18,9 @@ class AllJobAssamScraper(BaseScraper):
     def __init__(self):
         super().__init__(
             name="all_job_assam",
-            institution="All Job Assam",
-            source="AllJobAssam.com"
+            institution="AllJobAssam",
+            source="AllJobAssam.com",
+            institution_slug="all-job-assam"
         )
         self.target_url = "https://alljobassam.com"
 

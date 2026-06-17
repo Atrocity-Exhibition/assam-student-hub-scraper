@@ -10,7 +10,8 @@ class MangaldaiScraper(BaseScraper):
         super().__init__(
             name="mangaldai",
             institution="Mangaldai College",
-            source="Mangaldai College"
+            source="Mangaldai College",
+            institution_slug="mangaldai-college"
         )
         self.base_url = "https://mangaldaicollege.org"
         self.urls = ["https://mangaldaicollege.org/allNoticeView.php", "https://mangaldaicollege.org/"]

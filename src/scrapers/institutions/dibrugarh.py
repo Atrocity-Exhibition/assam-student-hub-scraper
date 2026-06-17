@@ -16,7 +16,8 @@ class DibrugarhScraper(BaseScraper):
         super().__init__(
             name="dibrugarh",
             institution="Dibrugarh University",
-            source="Dibrugarh University"
+            source="Dibrugarh University",
+            institution_slug="dibrugarh-university"
         )
         self.limit = limit
         self.api_url = f"https://lionfish-app-3a378.ondigitalocean.app/api/website/public/posts?limit={limit}"

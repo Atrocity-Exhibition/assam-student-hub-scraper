@@ -19,7 +19,8 @@ class NRLScraper(BaseScraper):
         super().__init__(
             name="nrl",
             institution="Numaligarh Refinery Limited",
-            source="NRL"
+            source="NRL",
+            institution_slug="numaligarh-refinery-limited"
         )
         self.pages = [
             "https://portal2.nrl.co.in/onlineapp/Home/CurrentOpenings",

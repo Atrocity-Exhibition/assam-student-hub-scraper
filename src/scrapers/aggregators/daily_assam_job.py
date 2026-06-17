@@ -10,7 +10,8 @@ class DailyAssamJobScraper(BaseScraper):
         super().__init__(
             name="daily_assam_job",
             institution="Daily Assam Job",
-            source="DailyAssamJob.in"
+            source="DailyAssamJob.in",
+            institution_slug="daily-assam-job"
         )
         self.pages = [
             "https://www.dailyassamjob.in/",
