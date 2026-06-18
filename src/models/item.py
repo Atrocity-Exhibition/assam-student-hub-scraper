@@ -45,6 +45,8 @@ class ScrapedItem(BaseModel):
             
             if data.get("posted_at"):
                 data["posted_at"] = normalize_date(data["posted_at"])
+            else:
+                data["posted_at"] = data.get("scraped_at") or datetime.now(timezone.utc)
                 
             # Force last_seen_at to timezone-aware UTC
             if data.get("last_seen_at"):
