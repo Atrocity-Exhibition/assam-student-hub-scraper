@@ -43,28 +43,57 @@ class MangaldaiScraper(BaseScraper):
             self.logger.error("Failed to fetch Mangaldai College website.")
             return items
 
-        for a in soup.select("a"):
+        # Find all message-body div elements representing notice items
+        message_bodies = soup.find_all(class_="message-body")
+        self.logger.info(f"Found {len(message_bodies)} notice containers (message-body) on Mangaldai page")
+
+        for msg_body in message_bodies:
             try:
-                title = clean_text(a.get_text())
-                href = a.get("href", "")
-                search_text = title.lower()
-
-                if len(title) < 10 or title in seen:
+                # Find wrapping <a> tag
+                a = msg_body.find_parent("a")
+                if not a:
                     continue
 
-                if any(junk in search_text for junk in self.junk_words):
+                href = a.get("href", "").strip()
+                if not href:
                     continue
 
-                if not any(k in search_text for k in self.relevant_keywords):
+                # Get title from h5
+                title_el = msg_body.find("h5")
+                if not title_el:
+                    continue
+                
+                title = clean_text(title_el.get_text())
+                if len(title) < 5 or title in seen:
                     continue
 
                 seen.add(title)
                 resolved_url = resolve_url(self.base_url, href)
 
+                # Parse relative date
                 posted_at = None
-                date_match = re.search(r"(\d{2}[-/\.]\d{2}[-/\.]\d{4})", title)
-                if date_match:
-                    posted_at = parse_date(date_match.group(1))
+                span_el = msg_body.find("span")
+                if span_el:
+                    posted_text = span_el.get_text().strip()
+                    # Parse "posted: X Years Y Months Z days ago"
+                    match = re.search(r"posted:\s*(?:(\d+)\s*Years?\s*)?(?:(\d+)\s*Months?\s*)?(?:(\d+)\s*days?\s*ago)?", posted_text, re.IGNORECASE)
+                    if match:
+                        years = int(match.group(1) or 0)
+                        months = int(match.group(2) or 0)
+                        days = int(match.group(3) or 0)
+                        
+                        # Fallback/broken epoch dates (e.g. 56 years ago) are ignored
+                        if years <= 10:
+                            # Calculate date backwards
+                            total_days = years * 365 + months * 30 + days
+                            from datetime import datetime, timedelta, timezone
+                            posted_at = datetime.now(timezone.utc) - timedelta(days=total_days)
+
+                # Fallback to standard date search in title
+                if not posted_at:
+                    date_match = re.search(r"(\d{2}[-/\.]\d{2}[-/\.]\d{4})", title)
+                    if date_match:
+                        posted_at = parse_date(date_match.group(1))
 
                 category = classify_category(title)
                 attachment_url = None
@@ -83,12 +112,10 @@ class MangaldaiScraper(BaseScraper):
                     "metadata": {
                         "original_source": self.base_url
                     },
-                    "raw_html": str(a)
+                    "raw_html": str(msg_body)
                 })
 
-                if len(items) >= 20:
-                    break
             except Exception as e:
-                self.logger.error(f"Error parsing link in Mangaldai: {e}")
+                self.logger.error(f"Error parsing notice item in Mangaldai: {e}")
 
         return items
