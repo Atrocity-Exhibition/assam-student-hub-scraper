@@ -129,11 +129,37 @@ def is_generic_title(title: str) -> bool:
             return True
     return False
 
+def is_pdf_or_drive_url(url: str) -> bool:
+    """
+    Check if URL points to a PDF file or a Google Drive file link.
+    """
+    if not url or not url.lower().startswith("http"):
+        return False
+    u_lower = url.lower()
+    return u_lower.endswith(".pdf") or "drive.google.com" in u_lower or "file/d/" in u_lower
+
+def get_drive_download_url(url: str) -> str:
+    """
+    Convert a Google Drive view link to a direct download URL.
+    """
+    match = re.search(r"/file/d/([^/]+)", url)
+    if match:
+        file_id = match.group(1)
+        return f"https://drive.google.com/uc?export=download&id={file_id}"
+    
+    match = re.search(r"[?&]id=([^&]+)", url)
+    if match:
+        file_id = match.group(1)
+        return f"https://drive.google.com/uc?export=download&id={file_id}"
+    
+    return url
+
 def extract_pdf_text(attachment_url: str) -> tuple[str, str | None]:
     """
     Download PDF, save to a temporary file, and extract text from the first 4 pages.
     Returns a tuple of (extracted_text, temp_file_path).
     """
+    attachment_url = get_drive_download_url(attachment_url)
     logger.info(f"Downloading PDF from: {attachment_url}")
     temp_file_path = None
     try:
@@ -560,6 +586,7 @@ def main():
         response = supabase.table("notices")\
             .select("id, title, description, category, attachment_url, source_url, metadata")\
             .eq("is_active", True)\
+            .order("id", desc=True)\
             .execute()
             
         all_notices = response.data or []
@@ -595,7 +622,7 @@ def main():
             source_url = notice.get("source_url")
             pdf_text = ""
             temp_file_path = None
-            if url and url.lower().startswith("http") and url.lower().endswith(".pdf"):
+            if is_pdf_or_drive_url(url):
                 pdf_text, temp_file_path = extract_pdf_text(url)
                 
             # Fallback to scraping webpage text if PDF extraction yields nothing and source_url is available
