@@ -83,10 +83,21 @@ def is_placeholder_description(desc: str, title: str) -> bool:
         if boilerplate_len < 100:
             return True
             
+    # Check if description ends with cut-off indicators typical of scraper excerpts
+    if desc_clean.endswith("-") or desc_clean.endswith("...") or desc_clean.endswith("..") or desc_clean.endswith("—") or desc_clean.endswith(".-"):
+        return True
+
     # If description is too short
     if len(desc_clean) < 120:
         return True
         
+    # If the description does not look like detailed Markdown (no headings/lists) and is relatively short
+    if len(desc_clean) < 400:
+        has_markdown_headers = bool(re.search(r'^#+\s+', desc_clean, re.MULTILINE))
+        has_markdown_lists = bool(re.search(r'^[\s\t]*[-*+]\s+', desc_clean, re.MULTILINE))
+        if not (has_markdown_headers or has_markdown_lists):
+            return True
+
     return False
 
 def needs_title_refinement(title: str) -> bool:
