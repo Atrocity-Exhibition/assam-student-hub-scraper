@@ -92,6 +92,10 @@ class ScrapedItem(BaseModel):
             if title and not data.get("content_hash"):
                 data["content_hash"] = generate_content_hash(title, desc)
                 
+            # Classify filter fields (experience, salary, education) inside metadata
+            from utils.normalizer import classify_filter_metadata
+            data["metadata"] = classify_filter_metadata(title, desc, data.get("metadata") or {})
+                
         return data
 
     def to_dict(self) -> dict:

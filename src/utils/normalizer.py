@@ -99,3 +99,114 @@ def generate_content_hash(title: str, description: str) -> str:
     # We join clean title and description as the fingerprint base
     hash_base = f"{norm_title}|{norm_desc}"
     return hashlib.sha256(hash_base.encode("utf-8")).hexdigest()
+
+def classify_filter_metadata(title: str, description: str, metadata: dict) -> dict:
+    """
+    Classifies a notice into normalized enums for education_level, salary_range, and experience_level.
+    """
+    text = (title + " " + description).lower()
+    
+    # Initialize fields inside metadata if not already present
+    edu = metadata.get("education_level")
+    sal = metadata.get("salary_range")
+    exp = metadata.get("experience_level")
+    
+    # 1. Experience Level Classification
+    if not exp:
+        exp_match = re.search(r'(\d+)\s*-\s*(\d+)\s*years?\s+exp', text) or \
+                    re.search(r'(\d+)\s*\+\s*years?\s+exp', text) or \
+                    re.search(r'exp(?:erience)?\s*(?:of|required)?\s*(\d+)\s*years?', text)
+        
+        fresher_kws = ["fresher", "no experience", "entry level", "training period", "apprentice", "internship"]
+        
+        if any(k in text for k in fresher_kws):
+            exp = "fresher"
+        elif exp_match:
+            try:
+                years = int(exp_match.group(1))
+                if years >= 5:
+                    exp = "5_plus_years"
+                elif years >= 3:
+                    exp = "3_5_years"
+                elif years >= 1:
+                    exp = "1_3_years"
+                else:
+                    exp = "fresher"
+            except ValueError:
+                exp = "fresher"
+        else:
+            years_matches = re.findall(r'(\d+)\s*years?\s*(?:work\s+)?experience', text)
+            if years_matches:
+                try:
+                    max_years = max(int(y) for y in years_matches)
+                    if max_years >= 5:
+                        exp = "5_plus_years"
+                    elif max_years >= 3:
+                        exp = "3_5_years"
+                    else:
+                        exp = "1_3_years"
+                except ValueError:
+                    exp = "fresher"
+            else:
+                exp = "fresher"
+                
+    # 2. Education Level Classification
+    if not edu:
+        pg_kws = ["post graduate", "pg degree", "postgraduate", "m.sc", "m.com", "m.a", "m.tech", "mba", "mca", "md/ms", "phd", "ph.d"]
+        grad_kws = ["graduate", "degree", "b.sc", "b.com", "b.a", "b.tech", "b.e", "bba", "bca", "mbbs", "llb"]
+        dip_kws = ["diploma", "iti", "polytechnic"]
+        school_kws = ["10th", "12th", "hslc", "hs pass", "matric", "class x", "class xii", "intermediate", "high school"]
+        
+        if any(k in text for k in pg_kws):
+            edu = "postgraduate"
+        elif any(k in text for k in grad_kws):
+            edu = "graduate"
+        elif any(k in text for k in dip_kws):
+            edu = "diploma_iti"
+        elif any(k in text for k in school_kws):
+            edu = "10th_12th"
+        else:
+            qual_text = str(metadata.get("qualification") or "").lower()
+            if any(k in qual_text for k in pg_kws):
+                edu = "postgraduate"
+            elif any(k in qual_text for k in grad_kws):
+                edu = "graduate"
+            elif any(k in qual_text for k in dip_kws):
+                edu = "diploma_iti"
+            elif any(k in qual_text for k in school_kws):
+                edu = "10th_12th"
+            else:
+                edu = "graduate"
+                
+    # 3. Salary Range Classification
+    if not sal:
+        sal_text = str(metadata.get("salary") or "").lower()
+        stipend_kws = ["stipend", "apprentice", "consolidated pay", "honorarium", "internship", "per day"]
+        
+        sal_numbers = [int(n) for n in re.findall(r'\b\d{4,6}\b', sal_text.replace(",", ""))]
+        if not sal_numbers:
+            sal_numbers = [int(n) for n in re.findall(r'\b\d{4,6}\b', text.replace(",", ""))]
+            
+        if sal_numbers:
+            max_val = max(sal_numbers)
+            if max_val > 150000:
+                max_val = max_val // 12
+                
+            if max_val >= 50000:
+                sal = "above_50k"
+            elif max_val >= 30000:
+                sal = "30k_50k"
+            elif max_val >= 15000:
+                sal = "15k_30k"
+            else:
+                sal = "below_15k"
+        elif any(k in sal_text or k in text for k in stipend_kws):
+            sal = "below_15k"
+        else:
+            sal = "15k_30k"
+            
+    metadata["education_level"] = edu
+    metadata["salary_range"] = sal
+    metadata["experience_level"] = exp
+    
+    return metadata

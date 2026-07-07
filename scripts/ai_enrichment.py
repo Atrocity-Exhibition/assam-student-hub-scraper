@@ -320,6 +320,7 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
             3. The notice title is "{title}". If it is a very generic word (e.g. 'Notice' or 'Recruitment'), is in ALL CAPS, contains words like 'Click here to Apply', or is poorly formatted, suggest a clean, properly cased (Title Case), and descriptive title under 100 characters in the "refined_title" key. Otherwise, set "refined_title" to null.
             4. Generate a professional, clean, and informative summary/description of 1 to 2 sentences suitable for a notification card.
             5. Set all other metadata fields to null.
+            6. Classify "education_level" (one of "10th_12th", "diploma_iti", "graduate", "postgraduate" or null), "salary_range" (one of "below_15k", "15k_30k", "30k_50k", "above_50k" or null), and "experience_level" (one of "fresher", "1_3_years", "3_5_years", "5_plus_years" or null) based on title keywords if possible.
             
             Response format: You MUST respond with a valid JSON object matching this schema exactly:
             {{
@@ -339,7 +340,10 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
               "exam_mode": null,
               "award_amount": null,
               "level": null,
-              "application_mode": null
+              "application_mode": null,
+              "education_level": null,
+              "salary_range": null,
+              "experience_level": null
             }}
             """
             contents = [prompt]
@@ -368,6 +372,9 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
                - "advt_no": Advertisement reference number (string or null).
                - "age_limit": Age eligibility criteria (short string, e.g. "18 - 40 years as of 01-01-2026" or null).
                - "apply_url": The actual official application, registration, or login URL (string or null) extracted from the document text. Look for URLs associated with phrases like "Apply Online", "Online Application Link", "Registration Link", "Official Website", etc. DO NOT return URLs that point back to aggregator domains (like `alljobassam.com`, `dailyassamjob.com`, `assamcareer.com`, `assamjobnews.com`, etc.) or social media domains. Only return the actual official portal or government application link.
+               - "education_level": Standardized minimum educational requirement. MUST be one of: "10th_12th", "diploma_iti", "graduate", "postgraduate" (or null).
+               - "salary_range": Standardized monthly salary range. MUST be one of: "below_15k", "15k_30k", "30k_50k", "above_50k" (or null).
+               - "experience_level": Standardized minimum experience required. MUST be one of: "fresher", "1_3_years", "3_5_years", "5_plus_years" (or null).
                
             If the category is "exam", also try to extract:
                - "exam_date": The date of the examination (short string or null).
@@ -397,7 +404,10 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
               "exam_mode": ...,
               "award_amount": ...,
               "level": ...,
-              "application_mode": ...
+              "application_mode": ...,
+              "education_level": ...,
+              "salary_range": ...,
+              "experience_level": ...
             }}
             
             Make sure all JSON keys are present. Set any fields that cannot be found to null.
@@ -427,6 +437,9 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
                - "advt_no": Advertisement reference number (string or null).
                - "age_limit": Age eligibility criteria (short string, e.g. "18 - 40 years as of 01-01-2026" or null).
                - "apply_url": The actual official application, registration, or login URL (string or null) extracted from the document text. Look for URLs associated with phrases like "Apply Online", "Online Application Link", "Registration Link", "Official Website", etc. DO NOT return URLs that point back to aggregator domains (like `alljobassam.com`, `dailyassamjob.com`, `assamcareer.com`, `assamjobnews.com`, etc.) or social media domains. Only return the actual official portal or government application link.
+               - "education_level": Standardized minimum educational requirement. MUST be one of: "10th_12th", "diploma_iti", "graduate", "postgraduate" (or null).
+               - "salary_range": Standardized monthly salary range. MUST be one of: "below_15k", "15k_30k", "30k_50k", "above_50k" (or null).
+               - "experience_level": Standardized minimum experience required. MUST be one of: "fresher", "1_3_years", "3_5_years", "5_plus_years" (or null).
                
             If the category is "exam", also try to extract:
                - "exam_date": The date of the examination (short string or null).
@@ -456,7 +469,10 @@ def enrich_notice(notice: dict, pdf_text: str, pdf_file_path: str | None) -> boo
               "exam_mode": ...,
               "award_amount": ...,
               "level": ...,
-              "application_mode": ...
+              "application_mode": ...,
+              "education_level": ...,
+              "salary_range": ...,
+              "experience_level": ...
             }}
             
             Make sure all JSON keys are present. Set any fields that cannot be found to null.
