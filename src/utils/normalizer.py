@@ -21,14 +21,37 @@ def clean_title(title: str) -> str:
 
 def normalize_description(description: str) -> str:
     """
-    Clean and normalize description content, removing HTML tags
-    and formatting whitespace.
+    Clean and normalize description content while preserving Markdown formatting and line breaks.
     """
     if not description:
         return ""
-    cleaned = re.sub(r'<[^>]*>', '', description)
-    cleaned = re.sub(r'\s+', ' ', cleaned)
-    return cleaned.strip()
+    
+    # Replace carriage returns
+    text = description.replace("\r\n", "\n").replace("\r", "\n")
+    
+    # Strip HTML tags if raw HTML is passed, preserving paragraph break structure
+    if "<" in text and ">" in text:
+        text = re.sub(r'<br\s*/?>', '\n', text, flags=re.IGNORECASE)
+        text = re.sub(r'</p>', '\n\n', text, flags=re.IGNORECASE)
+        text = re.sub(r'</div>', '\n', text, flags=re.IGNORECASE)
+        text = re.sub(r'<[^>]*>', '', text)
+    
+    # Normalize spaces per line while preserving linebreaks
+    lines = [re.sub(r'[ \t]+', ' ', line).strip() for line in text.split('\n')]
+    
+    # Collapse 3+ consecutive newlines to maximum 2 newlines
+    result_lines = []
+    prev_empty = False
+    for line in lines:
+        if not line:
+            if not prev_empty:
+                result_lines.append("")
+                prev_empty = True
+        else:
+            result_lines.append(line)
+            prev_empty = False
+            
+    return "\n".join(result_lines).strip()
 
 def normalize_date(date_input: Any) -> Optional[datetime]:
     """

@@ -94,3 +94,113 @@ def classify_category(title: str) -> str:
     else:
         return "notice"
 
+def convert_node_to_markdown(node) -> str:
+    if node is None:
+        return ""
+    if isinstance(node, str):
+        return node
+    
+    name = node.name.lower() if node.name else ""
+
+    # Noise removal
+    if name in ["script", "style", "ins", "iframe", "meta", "link"]:
+        return ""
+    
+    classes = node.get("class", [])
+    if isinstance(classes, list):
+        class_str = " ".join(classes).lower()
+    else:
+        class_str = str(classes).lower()
+        
+    if any(k in class_str for k in ["group-card", "whatsapp", "telegram", "adsbygoogle", "simplesharebuttons", "post-share"]):
+        return ""
+
+    # Inline formatting
+    if name in ["b", "strong"]:
+        inner = "".join(convert_node_to_markdown(c) for c in node.children).strip()
+        return f" **{inner}** " if inner else ""
+    elif name in ["i", "em"]:
+        inner = "".join(convert_node_to_markdown(c) for c in node.children).strip()
+        return f" *{inner}* " if inner else ""
+    elif name == "a":
+        inner = "".join(convert_node_to_markdown(c) for c in node.children).strip()
+        href = node.get("href", "").strip()
+        if not inner or not href:
+            return inner
+        if any(k in inner.lower() or k in href.lower() for k in ["whatsapp", "telegram", "instagram", "follow us"]):
+            return ""
+        return f" [{inner}]({href}) "
+    elif name == "br":
+        return "\n"
+    elif name in ["h1", "h2"]:
+        inner = clean_text(node.get_text())
+        return f"\n\n## {inner}\n\n" if inner else ""
+    elif name in ["h3", "h4", "h5", "h6"]:
+        inner = clean_text(node.get_text())
+        return f"\n\n### {inner}\n\n" if inner else ""
+    elif name == "p":
+        inner = "".join(convert_node_to_markdown(c) for c in node.children).strip()
+        return f"\n\n{inner}\n\n" if inner else ""
+    elif name == "div":
+        inner = "".join(convert_node_to_markdown(c) for c in node.children).strip()
+        return f"\n\n{inner}\n\n" if inner else ""
+    elif name in ["ul", "ol"]:
+        items = []
+        for li in node.find_all("li", recursive=False):
+            litext = "".join(convert_node_to_markdown(c) for c in li.children).strip()
+            if litext:
+                items.append(f"- {litext}")
+        return "\n\n" + "\n".join(items) + "\n\n"
+    elif name == "table":
+        rows = node.find_all("tr")
+        if not rows:
+            return ""
+        table_md = []
+        for idx, tr in enumerate(rows):
+            cols = [clean_text(c.get_text()) for c in tr.find_all(["td", "th"])]
+            if not cols or not any(cols):
+                continue
+            row_str = "| " + " | ".join(cols) + " |"
+            table_md.append(row_str)
+            if idx == 0:
+                separators = ["---"] * len(cols)
+                table_md.append("| " + " | ".join(separators) + " |")
+        return "\n\n" + "\n".join(table_md) + "\n\n"
+    else:
+        return "".join(convert_node_to_markdown(c) for c in node.children)
+
+def html_to_clean_markdown(body) -> str:
+    """
+    Recursively parse HTML post container into clean, well-formatted Markdown
+    preserving headings, bold fields, paragraphs, bullet points, tables, and links while
+    stripping unwanted promotional noise and social banners.
+    """
+    if not body:
+        return ""
+    
+    from bs4 import BeautifulSoup
+    body_copy = BeautifulSoup(str(body), "html.parser")
+    for noise in body_copy.select("script, style, ins, iframe, meta, link, .group-card, .whatsapp-card, .telegram-card, .adsbygoogle, .simplesharebuttons, .post-share-buttons"):
+        noise.decompose()
+        
+    md = convert_node_to_markdown(body_copy)
+    
+    lines = [line.strip() for line in md.split("\n")]
+    result_lines = []
+    prev_empty = False
+    
+    for line in lines:
+        if not line:
+            if not prev_empty:
+                result_lines.append("")
+                prev_empty = True
+        else:
+            line_clean = re.sub(r"[ \t]+", " ", line)
+            if any(k in line_clean.lower() for k in ["join whatsapp channel", "follow us telegram", "telegram channel join"]):
+                continue
+            result_lines.append(line_clean)
+            prev_empty = False
+            
+    return "\n".join(result_lines).strip()
+
+

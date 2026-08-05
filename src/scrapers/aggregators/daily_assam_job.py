@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 from bs4 import BeautifulSoup
 
 from scrapers.base_scraper import BaseScraper
-from utils.parser_utils import clean_text, parse_date, classify_category
+from utils.parser_utils import clean_text, parse_date, classify_category, html_to_clean_markdown
 from utils.normalizer import clean_title, normalize_date, normalize_category
 
 class DailyAssamJobScraper(BaseScraper):
@@ -32,71 +32,7 @@ class DailyAssamJobScraper(BaseScraper):
         ]
 
     def _html_to_markdown(self, element) -> str:
-        """
-        Convert BeautifulSoup post body into structured Markdown text.
-        """
-        if not element:
-            return ""
-        
-        element_copy = BeautifulSoup(str(element), "html.parser")
-        for noise in element_copy.select("script, style, ins, .adsbygoogle, .simplesharebuttons, .inline-ad, iframe, .post-share-buttons"):
-            noise.decompose()
-            
-        markdown_lines = []
-        
-        for child in element_copy.children:
-            if child.name is None:
-                text = child.string or ""
-                if text.strip():
-                    markdown_lines.append(text.strip())
-                continue
-                
-            if child.name in ["h1", "h2"]:
-                htext = clean_text(child.get_text())
-                if htext:
-                    markdown_lines.append(f"\n## {htext}\n")
-            elif child.name in ["h3", "h4", "h5", "h6"]:
-                htext = clean_text(child.get_text())
-                if htext:
-                    markdown_lines.append(f"\n### {htext}\n")
-            elif child.name == "p":
-                ptext = clean_text(child.get_text())
-                if ptext:
-                    markdown_lines.append(f"\n{ptext}\n")
-            elif child.name in ["ul", "ol"]:
-                for li in child.find_all("li", recursive=False):
-                    litext = clean_text(li.get_text())
-                    if litext:
-                        markdown_lines.append(f"- {litext}")
-                markdown_lines.append("")
-            elif child.name == "table":
-                rows = child.find_all("tr")
-                if not rows:
-                    continue
-                table_md = []
-                for idx, tr in enumerate(rows):
-                    cols = [clean_text(c.get_text()) for c in tr.find_all(["td", "th"])]
-                    if not cols or not any(cols):
-                        continue
-                    row_str = "| " + " | ".join(cols) + " |"
-                    table_md.append(row_str)
-                    if idx == 0:
-                        separators = ["---"] * len(cols)
-                        table_md.append("| " + " | ".join(separators) + " |")
-                if table_md:
-                    markdown_lines.append("\n" + "\n".join(table_md) + "\n")
-            elif child.name == "blockquote":
-                btext = clean_text(child.get_text())
-                if btext:
-                    markdown_lines.append(f"> {btext}\n")
-            else:
-                text = clean_text(child.get_text())
-                if text and len(text) > 10:
-                    markdown_lines.append(text)
-                    
-        result = "\n".join(markdown_lines)
-        result = re.sub(r"\n{3,}", "\n\n", result)
-        return result.strip()
+        return html_to_clean_markdown(element)
 
     def _scrape_detail_page(self, href: str) -> Dict[str, Any]:
         """
