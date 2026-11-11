@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS notices (
     scraped_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    content_hash TEXT NOT NULL UNIQUE,
+    content_hash TEXT NOT NULL,
     attachment_url TEXT,
     institution_id BIGINT REFERENCES institutions(id) ON DELETE SET NULL,
     is_official BOOLEAN DEFAULT true NOT NULL,

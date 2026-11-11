@@ -4,14 +4,10 @@ import logging
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 import requests
-import urllib3
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from models.item import ScrapedItem
 from config import settings
-
-# Disable warnings from insecure SSL connections (required for some official Govt servers)
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Ensure log directory exists
 os.makedirs("logs", exist_ok=True)
@@ -138,7 +134,7 @@ class BaseScraper(ABC):
                             params=params,
                             proxies=proxy_dict,
                             timeout=15,  # Limit proxy timeout to avoid long hangs
-                            verify=False
+                            verify=True
                         )
                         response.raise_for_status()
                         self.logger.info(f"Successfully fetched URL via proxy: {url}")
@@ -154,7 +150,7 @@ class BaseScraper(ABC):
                 headers=self.headers,
                 params=params,
                 timeout=self.timeout,
-                verify=False  # Disable SSL verification since some official Govt servers have broken cert paths
+                verify=True
             )
             response.raise_for_status()
             return response
@@ -187,7 +183,7 @@ class BaseScraper(ABC):
                         params=params,
                         proxies=proxy_dict,
                         timeout=15,
-                        verify=False
+                        verify=True
                     )
                     response.raise_for_status()
                     self.logger.info(f"Successfully fetched URL via proxy: {url}")
@@ -267,4 +263,3 @@ class BaseScraper(ABC):
             self.logger.exception(f"Scraper execution crashed: {e}")
             
         return validated_items
-

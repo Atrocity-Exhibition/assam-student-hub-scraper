@@ -28,6 +28,9 @@ SUPABASE_KEY=your_supabase_service_role_key
 DISCORD_WEBHOOK_URL=your_discord_alerts_webhook
 ```
 
+## Database migration
+For existing databases, run `migrations/001_allow_duplicate_content_hashes.sql` in the Supabase SQL Editor. The scraper's deduplication logic permits the same notice content to appear under multiple source URLs, so `content_hash` must not have a unique constraint.
+
 ## Local CLI Usage
 
 ```bash
