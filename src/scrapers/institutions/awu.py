@@ -62,7 +62,6 @@ class AWUScraper(BaseScraper):
                     self.api_url,
                     data=payload,
                     headers=self.headers,
-                    verify=False,
                     timeout=self.timeout
                 )
                 res.raise_for_status()

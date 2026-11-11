@@ -29,7 +29,7 @@ DISCORD_WEBHOOK_URL=your_discord_alerts_webhook
 ```
 
 ## Database migration
-For existing databases, run `migrations/001_allow_duplicate_content_hashes.sql` in the Supabase SQL Editor. The scraper's deduplication logic permits the same notice content to appear under multiple source URLs, so `content_hash` must not have a unique constraint.
+For existing databases, run `migrations/001_allow_duplicate_content_hashes.sql` and then `migrations/002_security_and_search.sql` in the Supabase SQL Editor. The second migration secures public table access, scopes saved rows to their owners, limits public scraper telemetry, and updates ranked search. Do not deploy the frontend changes until both migrations succeed.
 
 ## Local CLI Usage
 
@@ -51,3 +51,5 @@ python src/main.py --scraper cotton --dry-run
 # Run all scrapers in a specific schedule tier
 python src/main.py --frequency 6h
 ```
+
+Install `requirements-dev.txt` instead when running the test suite; it includes pytest.

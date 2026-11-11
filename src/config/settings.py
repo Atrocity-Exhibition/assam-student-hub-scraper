@@ -22,7 +22,7 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 # Default request headers mimicking a desktop browser to prevent user-agent blocks
 DEFAULT_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "User-Agent": "AssamStudentHubBot/1.0 (+https://assamstudenthub.xyz/)",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
     "Connection": "keep-alive"

@@ -4,7 +4,7 @@ import re
 
 url = "https://mangaldaicollege.org/allNoticeView.php"
 headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "User-Agent": "AssamStudentHubBot/1.0 (+https://assamstudenthub.xyz/)",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
     "Connection": "keep-alive"
@@ -12,8 +12,7 @@ headers = {
 
 print(f"Fetching {url}...")
 try:
-    # Use httpx with custom headers and verify=False
-    response = httpx.get(url, headers=headers, verify=False, timeout=15)
+    response = httpx.get(url, headers=headers, timeout=15)
     print(f"Response status: {response.status_code}")
     
     soup = BeautifulSoup(response.text, "html.parser")

@@ -38,7 +38,6 @@ class DonBoscoScraper(BaseScraper):
                 data={"Get Announcement": "Get Announcement"},
                 headers=self.headers,
                 timeout=15,
-                verify=False
             )
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")

@@ -74,9 +74,8 @@ class NHMAssamScraper(BaseScraper):
             # Use shorter timeout here so we don't hang the pipeline
             response = requests.get(
                 self.recruitment_url, 
-                headers=self.headers, 
-                timeout=10, 
-                verify=False
+                headers=self.headers,
+                timeout=10,
             )
             response.raise_for_status()
             soup = BeautifulSoup(response.text, "html.parser")

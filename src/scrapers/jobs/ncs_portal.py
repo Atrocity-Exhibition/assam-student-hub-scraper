@@ -38,8 +38,7 @@ class NCSPortalScraper(BaseScraper):
                     api_url, 
                     json=payload, 
                     headers=headers, 
-                    timeout=10, 
-                    verify=False
+                    timeout=10,
                 )
                 
                 if response.status_code == 200:
